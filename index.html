@@ -92,25 +92,69 @@
   .btn-block{width:100%;}
   .btn-sm{padding:7px 12px;font-size:12.5px;}
 
-  /* ---------- Login ---------- */
-  #screen-login{
-    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+  /* ---------- Pantallas de autenticación (splash / bienvenida / login) ---------- */
+  .auth-screen{
+    min-height:100vh;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:32px 24px;position:relative;overflow:hidden;text-align:center;
     background:
-      radial-gradient(circle at 15% 20%, rgba(227,160,8,.07), transparent 40%),
+      radial-gradient(circle at 15% 20%, rgba(227,160,8,.08), transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(227,160,8,.05), transparent 45%),
       var(--bg-base);
   }
+
+  .icon-badge{border-radius:22%;overflow:hidden;flex-shrink:0;box-shadow:0 8px 28px rgba(227,160,8,.18);}
+  .icon-badge svg{display:block;width:100%;height:100%;}
+  .icon-badge-xs{width:34px;height:34px;border-radius:24%;}
+  .icon-badge-sm{width:48px;height:48px;}
+  .icon-badge-md{width:72px;height:72px;margin:0 auto 18px;}
+  .icon-badge-lg{width:104px;height:104px;margin:0 auto 22px;}
+
+  /* Splash */
+  .breathe{animation:breathe 1.8s ease-in-out infinite;}
+  @keyframes breathe{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.06);opacity:.92;}}
+  .splash-name{font-family:var(--font-display);font-size:34px;letter-spacing:.03em;color:var(--text-primary);line-height:1;}
+  .splash-sub{font-family:var(--font-mono);font-size:12px;letter-spacing:.18em;color:var(--accent-amber);text-transform:uppercase;margin-top:6px;}
+  .splash-loader{display:flex;gap:7px;margin-top:34px;}
+  .splash-loader span{width:7px;height:7px;border-radius:50%;background:var(--accent-amber);animation:loaderDot 1s ease-in-out infinite;}
+  .splash-loader span:nth-child(2){animation-delay:.15s;}
+  .splash-loader span:nth-child(3){animation-delay:.3s;}
+  @keyframes loaderDot{0%,80%,100%{opacity:.25;transform:translateY(0);}40%{opacity:1;transform:translateY(-4px);}}
+
+  /* Bienvenida */
+  .welcome-watermark{
+    position:absolute;bottom:-60px;right:-60px;width:340px;height:340px;opacity:.05;
+    transform:rotate(-9deg);pointer-events:none;
+  }
+  .welcome-watermark svg{width:100%;height:100%;display:block;}
+  .welcome-content{position:relative;z-index:1;width:100%;max-width:400px;display:flex;flex-direction:column;align-items:center;}
+  .welcome-title{font-family:var(--font-display);font-size:34px;letter-spacing:.02em;line-height:1.05;color:var(--text-primary);}
+  .welcome-tagline{color:var(--text-muted);font-size:14px;margin-top:8px;margin-bottom:30px;}
+  .welcome-features{width:100%;display:flex;flex-direction:column;gap:14px;margin-bottom:32px;}
+  .welcome-feature{
+    display:flex;align-items:center;gap:12px;text-align:left;background:var(--bg-panel);
+    border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;font-size:13.5px;color:var(--text-primary);
+  }
+  .wf-icon{font-size:20px;flex-shrink:0;width:26px;text-align:center;}
+
+  /* Login */
   .login-card{
     width:100%;max-width:400px;background:var(--bg-panel);border:1px solid var(--line);
-    border-radius:10px;padding:32px 28px 28px;
+    border-radius:10px;padding:32px 28px 28px;position:relative;z-index:1;text-align:left;
   }
-  .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+  .login-back{
+    position:absolute;top:16px;left:16px;background:transparent;border:none;color:var(--text-faint);
+    font-family:var(--font-mono);font-size:12px;cursor:pointer;padding:4px;
+  }
+  .login-back:hover{color:var(--text-muted);}
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:4px;margin-top:14px;}
   .brand-mark{
     width:34px;height:34px;border-radius:5px;background:var(--accent-amber);
     display:flex;align-items:center;justify-content:center;color:#1B1400;font-family:var(--font-display);
     font-size:20px;flex-shrink:0;
   }
-  .brand-name{font-family:var(--font-display);font-size:22px;letter-spacing:.02em;line-height:1;}
+  .brand-name{font-family:var(--font-display);font-size:20px;letter-spacing:.02em;line-height:1.15;}
   .brand-sub{color:var(--text-muted);font-size:12.5px;margin:2px 0 26px 44px;}
+  .brand-sub-inline{color:var(--text-muted);font-size:12px;margin-top:3px;}
   .tabs{display:flex;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;}
   .tab{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;background:var(--bg-input);}
   .tab.active{background:var(--accent-amber);color:#1B1400;}
@@ -123,6 +167,12 @@
   .role-choice input{display:none;}
   .role-choice input:checked + span{color:var(--accent-amber);font-weight:600;}
   .role-choice label:has(input:checked){border-color:var(--accent-amber);background:var(--accent-amber-soft);}
+
+  @media(max-width:400px){
+    .icon-badge-lg{width:84px;height:84px;}
+    .splash-name{font-size:28px;}
+    .welcome-title{font-size:28px;}
+  }
 
   /* ---------- App shell ---------- */
   #app{display:none;min-height:100vh;}
@@ -186,8 +236,8 @@
   .gps-readout{font-family:var(--font-mono);font-size:13px;color:var(--text-primary);}
   .gps-readout .muted{color:var(--text-faint);}
 
-  .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-  @media(max-width:480px){.photo-grid{grid-template-columns:1fr;}}
+  .photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:340px;}
+  @media(max-width:480px){.photo-grid{grid-template-columns:1fr 1fr;max-width:none;}}
   .photo-slot{
     border:1px dashed var(--line);border-radius:var(--radius);aspect-ratio:1/1;position:relative;
     overflow:hidden;background:var(--bg-input);cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -208,7 +258,7 @@
   /* ---------- Records table ---------- */
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
   .toolbar input,.toolbar select{width:auto;min-width:140px;}
-  .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;}
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;}
   @media(max-width:760px){.stat-row{grid-template-columns:repeat(2,1fr);}}
   .stat-card{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
   .stat-num{font-family:var(--font-display);font-size:28px;color:var(--accent-amber);line-height:1;}
@@ -243,7 +293,7 @@
   .modal-close{float:right;background:transparent;color:var(--text-muted);border:none;font-size:20px;cursor:pointer;}
   .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin:16px 0;font-size:13.5px;}
   .detail-grid .k{color:var(--text-faint);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;}
-  .detail-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+  .detail-photos{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;max-width:400px;}
   .detail-photos img{width:100%;border-radius:6px;aspect-ratio:1/1;object-fit:cover;background:var(--bg-input);}
 
   .toast{
@@ -277,14 +327,118 @@
 
 <div id="banner-prueba">⚠ MODO PRUEBA — estos datos son de práctica y no afectan la operación real</div>
 
-<!-- ============ LOGIN ============ -->
-<div id="screen-login">
-  <div class="login-card">
-    <div class="brand">
-      <div class="brand-mark">B</div>
-      <div class="brand-name">BITÁCORA DE MAQUINARIA</div>
+<!-- ============ SPLASH (pantalla de carga inicial) ============ -->
+<div id="screen-splash" class="auth-screen">
+  <div class="icon-badge icon-badge-lg breathe">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" fill="#E3A008"/>
+      <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+      <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+      <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+      <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+      <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+      <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+      <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+      <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+      <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+      <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+      <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+      <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+    </svg>
+  </div>
+  <div class="splash-name">BITÁCORA</div>
+  <div class="splash-sub">DE MAQUINARIA</div>
+  <div class="splash-loader"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ============ BIENVENIDA ============ -->
+<div id="screen-welcome" class="auth-screen hidden">
+  <div class="welcome-watermark">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" fill="#E3A008"/>
+      <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+      <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+      <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+      <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+      <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+      <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+      <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+      <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+      <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+      <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+      <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+      <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+    </svg>
+  </div>
+  <div class="welcome-content">
+    <div class="icon-badge icon-badge-md">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" fill="#E3A008"/>
+        <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+        <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+        <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+        <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+        <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+        <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+        <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+        <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+        <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+        <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+        <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+        <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+      </svg>
     </div>
-    <div class="brand-sub">Auditoría de remoción de escombros</div>
+    <div class="welcome-title">BITÁCORA<br>DE MAQUINARIA</div>
+    <div class="welcome-tagline">Auditoría de remoción de escombros</div>
+
+    <div class="welcome-features">
+      <div class="welcome-feature">
+        <span class="wf-icon">📷</span>
+        <span>Registro fotográfico con hora y ubicación quemadas en cada foto</span>
+      </div>
+      <div class="welcome-feature">
+        <span class="wf-icon">📍</span>
+        <span>Verifica que la máquina esté en el sitio de obra declarado</span>
+      </div>
+      <div class="welcome-feature">
+        <span class="wf-icon">📶</span>
+        <span>Funciona sin señal — sincroniza en cuanto vuelve la conexión</span>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-primary btn-block" id="btn-welcome-continue">Comenzar</button>
+  </div>
+</div>
+
+<!-- ============ LOGIN ============ -->
+<div id="screen-login" class="auth-screen hidden">
+  <div class="login-card">
+    <button type="button" class="login-back" id="btn-login-back">← Volver</button>
+    <div class="brand">
+      <div class="icon-badge icon-badge-sm">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="100" fill="#E3A008"/>
+          <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+          <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+          <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+          <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+          <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+          <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+          <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+          <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+          <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+          <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+          <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+          <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">BITÁCORA DE MAQUINARIA</div>
+        <div class="brand-sub-inline">Auditoría de remoción de escombros</div>
+      </div>
+    </div>
+
+    <div class="ticket-perf" style="margin:22px 0;"></div>
 
     <div class="tabs">
       <div class="tab active" id="tab-signin">Ingresar</div>
@@ -321,7 +475,23 @@
 <div id="app">
   <div class="sidebar">
     <div class="brand" style="margin-bottom:22px;">
-      <div class="brand-mark">B</div>
+      <div class="icon-badge icon-badge-xs">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100" height="100" fill="#E3A008"/>
+          <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+          <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+          <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+          <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+          <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+          <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+          <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+          <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+          <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+          <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+          <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+          <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+        </svg>
+      </div>
       <div class="brand-name" style="font-size:17px;">BITÁCORA</div>
     </div>
     <div class="nav-item" data-view="captura" id="nav-captura"><span class="nav-icon">＋</span> Nuevo registro</div>
@@ -367,25 +537,14 @@
                 <label class="label">Operador</label>
                 <input type="text" id="f-operador" required>
               </div>
-            </div>
-
-            <div class="section-title">Mediciones</div>
-            <div class="grid-2">
               <div class="field">
-                <label class="label">Lectura de horómetro (h)</label>
-                <input type="number" step="0.1" id="f-horometro" required>
-              </div>
-              <div class="field">
-                <label class="label">Horas trabajadas en la jornada</label>
-                <input type="number" step="0.1" id="f-horas" required>
-              </div>
-              <div class="field">
-                <label class="label">Combustible suministrado (litros)</label>
-                <input type="number" step="0.1" id="f-combustible">
-              </div>
-              <div class="field">
-                <label class="label">Volumen de escombro removido (m³)</label>
-                <input type="number" step="0.1" id="f-volumen" required>
+                <label class="label">Turno</label>
+                <select id="f-turno" required>
+                  <option value="">Seleccionar…</option>
+                  <option value="Mañana">Mañana</option>
+                  <option value="Tarde">Tarde</option>
+                  <option value="Noche">Noche</option>
+                </select>
               </div>
             </div>
 
@@ -415,11 +574,6 @@
                 <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
                 <input type="file" accept="image/*" capture="environment" data-slot="antes">
               </label>
-              <label class="photo-slot" id="slot-durante">
-                <span class="tag">Durante</span>
-                <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
-                <input type="file" accept="image/*" capture="environment" data-slot="durante">
-              </label>
               <label class="photo-slot" id="slot-despues">
                 <span class="tag">Después</span>
                 <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
@@ -427,9 +581,9 @@
               </label>
             </div>
 
-            <div class="section-title">Observaciones</div>
+            <div class="section-title">Comentarios sobre el trabajo</div>
             <div class="field">
-              <textarea id="f-notas" placeholder="Notas adicionales, incidencias, condiciones de acceso, etc."></textarea>
+              <textarea id="f-notas" placeholder="Describe qué trabajo está realizando la máquina en este momento." required></textarea>
             </div>
 
             <button type="submit" class="btn btn-primary btn-block" id="btn-guardar" style="margin-top:8px;">Guardar registro</button>
@@ -444,7 +598,7 @@
       <p class="page-sub">Historial de registros capturados desde este dispositivo.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Máquina</th><th>Contratista</th><th>Vol. m³</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Turno</th><th>Máquina</th><th>Contratista</th><th>Estado</th></tr></thead>
           <tbody id="tbody-mis-registros"></tbody>
         </table>
       </div>
@@ -457,9 +611,8 @@
 
       <div class="stat-row">
         <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Registros</div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-volumen">0</div><div class="stat-label">m³ removidos</div></div>
-        <div class="stat-card"><div class="stat-num" id="stat-horas">0</div><div class="stat-label">Horas máquina</div></div>
         <div class="stat-card"><div class="stat-num" id="stat-maquinas">0</div><div class="stat-label">Máquinas activas</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-sitios">0</div><div class="stat-label">Sitios visitados</div></div>
         <div class="stat-card"><div class="stat-num" id="stat-alertas" style="color:var(--danger);">0</div><div class="stat-label">Con alertas</div></div>
       </div>
 
@@ -478,7 +631,7 @@
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Máquina</th><th>Contratista</th><th>Operador</th><th>Horas</th><th>Comb. (L)</th><th>Vol. m³</th><th>Fotos</th><th>Verificación</th><th>Capturó</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Turno</th><th>Máquina</th><th>Contratista</th><th>Operador</th><th>Fotos</th><th>Verificación</th><th>Capturó</th></tr></thead>
           <tbody id="tbody-panel"></tbody>
         </table>
       </div>
@@ -641,63 +794,78 @@ async function deletePendingPhoto(id){
   });
 }
 
-function compressImage(file, maxWidth = 1000, quality = 0.6){
-  return new Promise((resolve) => {
+/* Decodifica la foto directo a un canvas ya reducido de tamaño, evitando
+   mantener en memoria la imagen a su resolución original completa (una foto
+   de celular moderno puede pesar 12+ MP sin comprimir). Esto es justo lo que
+   estaba causando el cierre por "poca memoria" en celulares: createImageBitmap
+   con resizeWidth le pide al navegador que decodifique ya reducida, en vez de
+   decodificar completa y recién después achicarla con canvas. */
+async function decodificarReducido(file, maxWidth){
+  if (window.createImageBitmap){
+    try{
+      const bitmap = await createImageBitmap(file, { resizeWidth: maxWidth, resizeQuality: "medium" });
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext("2d").drawImage(bitmap, 0, 0);
+      if (bitmap.close) bitmap.close();
+      return canvas;
+    } catch(err){
+      console.warn("createImageBitmap con resize falló, usando método alterno:", err.message);
+    }
+  }
+  // Alternativa para navegadores sin soporte: usa un object URL (no base64)
+  // para no duplicar la foto completa en memoria como texto.
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
     const img = new Image();
-    const reader = new FileReader();
-    reader.onload = (e) => { img.src = e.target.result; };
     img.onload = () => {
       const scale = Math.min(1, maxWidth / img.width);
       const canvas = document.createElement("canvas");
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
     };
-    reader.readAsDataURL(file);
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
   });
+}
+
+function compressImage(file, maxWidth = 1000, quality = 0.6){
+  return decodificarReducido(file, maxWidth).then(canvas =>
+    new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality))
+  );
 }
 
 /* Comprime la foto y le quema encima fecha/hora + coordenadas + precisión GPS,
    como prueba visual de dónde y cuándo se tomó (estilo "geotag camera"). */
-function compressAndWatermark(file, meta, maxWidth = 1000, quality = 0.65){
-  return new Promise((resolve) => {
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = (e) => { img.src = e.target.result; };
-    img.onload = () => {
-      const scale = Math.min(1, maxWidth / img.width);
-      const w = img.width * scale, h = img.height * scale;
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
+async function compressAndWatermark(file, meta, maxWidth = 1000, quality = 0.65){
+  const canvas = await decodificarReducido(file, maxWidth);
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
 
-      const fecha = new Date(meta.timestamp);
-      const lineas = [
-        fecha.toLocaleDateString("es-VE", { day:"2-digit", month:"2-digit", year:"numeric" }) + "  " + fecha.toLocaleTimeString("es-VE", { hour:"2-digit", minute:"2-digit", second:"2-digit" }),
-        meta.lat != null ? `${meta.lat.toFixed(6)}, ${meta.lng.toFixed(6)}  ±${Math.round(meta.precision)}m` : "Sin GPS disponible",
-        meta.etiqueta || ""
-      ].filter(Boolean);
+  const fecha = new Date(meta.timestamp);
+  const lineas = [
+    fecha.toLocaleDateString("es-VE", { day:"2-digit", month:"2-digit", year:"numeric" }) + "  " + fecha.toLocaleTimeString("es-VE", { hour:"2-digit", minute:"2-digit", second:"2-digit" }),
+    meta.lat != null ? `${meta.lat.toFixed(6)}, ${meta.lng.toFixed(6)}  ±${Math.round(meta.precision)}m` : "Sin GPS disponible",
+    meta.etiqueta || ""
+  ].filter(Boolean);
 
-      const padding = Math.max(8, w * 0.02);
-      const fontSize = Math.max(11, Math.round(w * 0.028));
-      ctx.font = `${fontSize}px 'IBM Plex Mono', monospace`;
-      const lineHeight = fontSize * 135 / 1000 * 10;
-      const bandHeight = lineas.length * (fontSize + 6) + padding;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(0, h - bandHeight, w, bandHeight);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.textBaseline = "top";
-      lineas.forEach((linea, i) => {
-        ctx.fillText(linea, padding, h - bandHeight + padding/2 + i * (fontSize + 6));
-      });
-
-      canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
-    };
-    reader.readAsDataURL(file);
+  const padding = Math.max(8, w * 0.02);
+  const fontSize = Math.max(11, Math.round(w * 0.028));
+  ctx.font = `${fontSize}px 'IBM Plex Mono', monospace`;
+  const bandHeight = lineas.length * (fontSize + 6) + padding;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(0, h - bandHeight, w, bandHeight);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.textBaseline = "top";
+  lineas.forEach((linea, i) => {
+    ctx.fillText(linea, padding, h - bandHeight + padding/2 + i * (fontSize + 6));
   });
+
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality));
 }
 
 async function syncPendingPhotos(){
@@ -793,8 +961,8 @@ let currentUser = null;
 let currentRole = null;
 let currentUserNombre = "";
 let capturaGPS = null;
-let fotosSeleccionadas = { antes: null, durante: null, despues: null };
-let fotosMeta = { antes: null, durante: null, despues: null }; // {lat,lng,precision,timestamp}
+let fotosSeleccionadas = { antes: null, despues: null };
+let fotosMeta = { antes: null, despues: null }; // {lat,lng,precision,timestamp}
 let unsubRegistros = null;
 let cacheRegistros = [];
 let cacheSitios = [];
@@ -919,6 +1087,18 @@ function traducirErrorAuth(code){
   return map[code] || "Ocurrió un error. Intenta de nuevo.";
 }
 
+function mostrarPantallaAuth(nombre){
+  ["splash","welcome","login"].forEach(n => {
+    $(`#screen-${n}`).classList.toggle("hidden", n !== nombre);
+  });
+}
+
+$("#btn-welcome-continue").onclick = () => {
+  localStorage.setItem("bitacora_welcome_visto", "1");
+  mostrarPantallaAuth("login");
+};
+$("#btn-login-back").onclick = () => mostrarPantallaAuth("welcome");
+
 $("#btn-logout").onclick = () => signOut(auth);
 
 $("#btn-modo-prueba").onclick = () => {
@@ -936,7 +1116,7 @@ onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     const userDoc = await getDoc(doc(db, "usuarios", user.uid));
     currentRole = userDoc.exists() ? userDoc.data().role : "campo";
-    $("#screen-login").style.display = "none";
+    mostrarPantallaAuth(null);
     $("#app").classList.add("active");
     $("#user-chip").textContent = `${userDoc.data()?.nombre || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
     if (currentRole === "admin"){
@@ -954,8 +1134,9 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     currentUser = null; currentRole = null;
     if (unsubRegistros) unsubRegistros();
-    $("#screen-login").style.display = "flex";
     $("#app").classList.remove("active");
+    const yaVioBienvenida = localStorage.getItem("bitacora_welcome_visto") === "1";
+    mostrarPantallaAuth(yaVioBienvenida ? "login" : "welcome");
   }
 });
 
@@ -1017,10 +1198,17 @@ function attachPhotoInputListener(input){
     const meta = { lat: gps?.lat ?? null, lng: gps?.lng ?? null, precision: gps?.precision ?? null, timestamp, etiqueta: slot.toUpperCase() };
     fotosMeta[slot] = meta;
 
-    const compressed = await compressAndWatermark(file, meta);
-    fotosSeleccionadas[slot] = compressed;
-    const url = URL.createObjectURL(compressed);
-    container.innerHTML = `<span class="tag">${slot}</span><img src="${url}"><span class="clear-btn" data-clear="${slot}">✕</span>`;
+    try{
+      const compressed = await compressAndWatermark(file, meta);
+      fotosSeleccionadas[slot] = compressed;
+      const url = URL.createObjectURL(compressed);
+      container.innerHTML = `<span class="tag">${slot}</span><img src="${url}"><span class="clear-btn" data-clear="${slot}">✕</span>`;
+    } catch(err){
+      console.error("Error procesando foto:", err);
+      showToast(`No se pudo procesar la foto de "${slot}". Intenta de nuevo (a veces ayuda tomarla con menos zoom o resolución).`, "error");
+      container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
+      attachPhotoInputListener(container.querySelector('input'));
+    }
   });
 }
 $all('input[type=file][data-slot]').forEach(attachPhotoInputListener);
@@ -1070,10 +1258,7 @@ $("#form-captura").addEventListener("submit", async (e) => {
     codigoMaquina: $("#f-codigo").value.trim(),
     contratista: $("#f-contratista").value.trim(),
     operador: $("#f-operador").value.trim(),
-    horometro: parseFloat($("#f-horometro").value) || 0,
-    horasTrabajadas: parseFloat($("#f-horas").value) || 0,
-    combustibleLitros: parseFloat($("#f-combustible").value) || 0,
-    volumenM3: parseFloat($("#f-volumen").value) || 0,
+    turno: $("#f-turno").value,
     ubicacion: capturaGPS,
     sitioId: sitioId || null,
     sitioNombre: sitio ? sitio.nombre : null,
@@ -1085,7 +1270,6 @@ $("#form-captura").addEventListener("submit", async (e) => {
     notas: $("#f-notas").value.trim(),
     fotos: {
       antes: { estado: fotosSeleccionadas.antes ? "pendiente" : "sin_foto", url: null, ubicacion: fotosMeta.antes ? { lat: fotosMeta.antes.lat, lng: fotosMeta.antes.lng, precision: fotosMeta.antes.precision } : null, timestamp: fotosMeta.antes?.timestamp || null },
-      durante: { estado: fotosSeleccionadas.durante ? "pendiente" : "sin_foto", url: null, ubicacion: fotosMeta.durante ? { lat: fotosMeta.durante.lat, lng: fotosMeta.durante.lng, precision: fotosMeta.durante.precision } : null, timestamp: fotosMeta.durante?.timestamp || null },
       despues: { estado: fotosSeleccionadas.despues ? "pendiente" : "sin_foto", url: null, ubicacion: fotosMeta.despues ? { lat: fotosMeta.despues.lat, lng: fotosMeta.despues.lng, precision: fotosMeta.despues.precision } : null, timestamp: fotosMeta.despues?.timestamp || null }
     },
     capturadoPor: currentUser.uid,
@@ -1112,7 +1296,7 @@ $("#form-captura").addEventListener("submit", async (e) => {
     } catch(err){ console.warn("No se pudo verificar el reloj del servidor:", err.message); }
 
     // encolar fotos localmente y disparar sincronización
-    for (const slot of ["antes","durante","despues"]){
+    for (const slot of ["antes","despues"]){
       if (fotosSeleccionadas[slot]){
         const id = `${docRef.id}_${slot}_${Date.now()}`;
         await savePendingPhoto(id, fotosSeleccionadas[slot], { registroId: docRef.id, slot, coleccion: col("registros"), carpeta: carpetaFotos() });
@@ -1127,9 +1311,9 @@ $("#form-captura").addEventListener("submit", async (e) => {
     }
 
     $("#form-captura").reset();
-    fotosSeleccionadas = { antes: null, durante: null, despues: null };
-    fotosMeta = { antes: null, durante: null, despues: null };
-    ["antes","durante","despues"].forEach(slot => {
+    fotosSeleccionadas = { antes: null, despues: null };
+    fotosMeta = { antes: null, despues: null };
+    ["antes","despues"].forEach(slot => {
       const container = $(`#slot-${slot}`);
       container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
       attachPhotoInputListener(container.querySelector('input'));
@@ -1158,15 +1342,15 @@ function cargarMisRegistros(){
     tbody.innerHTML = propios.map(r => `
       <tr>
         <td>${formatFecha(r.timestampCaptura)}</td>
+        <td>${r.turno || '—'}</td>
         <td>${r.tipoMaquinaCodigo || r.tipoMaquina} · ${r.codigoMaquina}</td>
         <td>${r.contratista}</td>
-        <td>${r.volumenM3}</td>
         <td><span class="badge ${todasFotosListas(r) ? 'badge-ok':'badge-pending'}">${todasFotosListas(r) ? 'Sincronizado':'Enviando fotos'}</span></td>
       </tr>`).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">Aún no has capturado registros.</td></tr>`;
   });
 }
 function todasFotosListas(r){
-  return ["antes","durante","despues"].every(s => r.fotos[s].estado !== "pendiente");
+  return ["antes","despues"].every(s => r.fotos[s].estado !== "pendiente");
 }
 function formatFecha(iso){
   if (!iso) return "—";
@@ -1222,25 +1406,22 @@ function renderTablaPanel(){
   $("#tbody-panel").innerHTML = datos.map(r => `
     <tr data-id="${r.id}">
       <td>${formatFecha(r.timestampCaptura)}</td>
+      <td>${r.turno || '—'}</td>
       <td>${r.tipoMaquinaCodigo ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--accent-amber);">${r.tipoMaquinaCodigo}</span><br>` : ''}${r.tipoMaquina}<br><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11.5px;">Unidad ${r.codigoMaquina}</span></td>
       <td>${r.contratista}</td>
       <td>${r.operador}</td>
-      <td>${r.horasTrabajadas}</td>
-      <td>${r.combustibleLitros || "—"}</td>
-      <td>${r.volumenM3}</td>
-      <td><span class="badge ${todasFotosListas(r) ? 'badge-ok':'badge-pending'}">${contarFotos(r)}/3</span></td>
+      <td><span class="badge ${todasFotosListas(r) ? 'badge-ok':'badge-pending'}">${contarFotos(r)}/2</span></td>
       <td>${badgesVerificacion(r)}</td>
       <td style="font-size:12px;color:var(--text-muted);">${r.capturadoPorNombre?.split(' · ')[0] || '—'}</td>
-    </tr>`).join("") || `<tr><td colspan="10" style="color:var(--text-faint);padding:16px;">No hay registros que coincidan con el filtro.</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="8" style="color:var(--text-faint);padding:16px;">No hay registros que coincidan con el filtro.</td></tr>`;
   $all("#tbody-panel tr[data-id]").forEach(tr => tr.onclick = () => abrirDetalle(tr.dataset.id));
 }
-function contarFotos(r){ return ["antes","durante","despues"].filter(s => r.fotos[s].estado !== "sin_foto").length; }
+function contarFotos(r){ return ["antes","despues"].filter(s => r.fotos[s].estado !== "sin_foto").length; }
 function renderStats(){
   const datos = registrosFiltrados();
   $("#stat-total").textContent = datos.length;
-  $("#stat-volumen").textContent = datos.reduce((a,r) => a + (r.volumenM3||0), 0).toFixed(1);
-  $("#stat-horas").textContent = datos.reduce((a,r) => a + (r.horasTrabajadas||0), 0).toFixed(1);
   $("#stat-maquinas").textContent = new Set(datos.map(r => r.codigoMaquina)).size;
+  $("#stat-sitios").textContent = new Set(datos.map(r => r.sitioNombre).filter(Boolean)).size;
   $("#stat-alertas").textContent = datos.filter(r => r.alertaUbicacion || r.alertaReloj).length;
 }
 ["filtro-texto","filtro-contratista","filtro-tipo","filtro-alerta"].forEach(id => {
@@ -1267,15 +1448,12 @@ function abrirDetalle(id){
         <div class="section-title" style="margin-top:0;">${r.tipoMaquinaCodigo ? `${r.tipoMaquinaCodigo} — ` : ''}${r.tipoMaquina} · Unidad ${r.codigoMaquina}</div>
         <div class="detail-grid">
           <div><div class="k">Fecha</div>${formatFecha(r.timestampCaptura)}</div>
+          <div><div class="k">Turno</div>${r.turno || '—'}</div>
           <div><div class="k">Contratista</div>${r.contratista}</div>
           <div><div class="k">Operador</div>${r.operador}</div>
-          <div><div class="k">Horómetro</div>${r.horometro} h</div>
-          <div><div class="k">Horas trabajadas</div>${r.horasTrabajadas} h</div>
-          <div><div class="k">Combustible</div>${r.combustibleLitros || '—'} L</div>
-          <div><div class="k">Volumen removido</div>${r.volumenM3} m³</div>
           <div><div class="k">Ubicación</div>${mapsLink ? `<a href="${mapsLink}" target="_blank">Ver en mapa</a>` : '—'}</div>
           <div style="grid-column:1/-1;"><div class="k">Referencia</div>${r.referencia || '—'}</div>
-          <div style="grid-column:1/-1;"><div class="k">Notas</div>${r.notas || '—'}</div>
+          <div style="grid-column:1/-1;"><div class="k">Comentarios sobre el trabajo</div>${r.notas || '—'}</div>
         </div>
         <div class="section-title">Verificación de campo</div>
         <div class="detail-grid">
@@ -1283,7 +1461,7 @@ function abrirDetalle(id){
           <div style="grid-column:1/-1;"><div class="k">Reloj del dispositivo</div>${verifReloj}</div>
         </div>
         <div class="detail-photos">
-          ${["antes","durante","despues"].map(s => {
+          ${["antes","despues"].map(s => {
             const f = r.fotos[s];
             const coordTxt = f.ubicacion?.lat != null ? `${f.ubicacion.lat.toFixed(5)}, ${f.ubicacion.lng.toFixed(5)}` : "sin GPS";
             return f.url
@@ -1300,10 +1478,9 @@ function abrirDetalle(id){
 /* Exportar CSV */
 $("#btn-export-csv").onclick = () => {
   const datos = registrosFiltrados();
-  const headers = ["Fecha","CodigoTipo","Tipo","UnidadPlaca","Contratista","Operador","Horometro","HorasTrabajadas","CombustibleLitros","VolumenM3","Lat","Lng","SitioDeclarado","DistanciaAlSitioM","FueraDeZona","AlertaReloj","DriftRelojMinutos","Referencia","Notas","CapturadoPor"];
+  const headers = ["Fecha","Turno","CodigoTipo","Tipo","UnidadPlaca","Contratista","Operador","Lat","Lng","SitioDeclarado","DistanciaAlSitioM","FueraDeZona","AlertaReloj","DriftRelojMinutos","Referencia","ComentariosTrabajo","CapturadoPor"];
   const filas = datos.map(r => [
-    formatFecha(r.timestampCaptura), r.tipoMaquinaCodigo || "", r.tipoMaquina, r.codigoMaquina, r.contratista, r.operador,
-    r.horometro, r.horasTrabajadas, r.combustibleLitros, r.volumenM3,
+    formatFecha(r.timestampCaptura), r.turno || "", r.tipoMaquinaCodigo || "", r.tipoMaquina, r.codigoMaquina, r.contratista, r.operador,
     r.ubicacion?.lat || "", r.ubicacion?.lng || "",
     r.sitioNombre || "", r.distanciaAlSitioM ?? "", r.alertaUbicacion ? "SI" : "NO",
     r.alertaReloj ? "SI" : "NO", r.driftRelojMinutos ?? "",
