@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Bitácora de Maquinaria — Remoción de Escombros</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="favicon-32.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bitácora">
+<meta name="theme-color" content="#1B1F24">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-base:#1B1F24;
+    --bg-panel:#242A31;
+    --bg-panel-raised:#2E353D;
+    --bg-input:#1F252B;
+    --line:#3A424B;
+    --line-soft:#2C333A;
+    --text-primary:#ECEEF0;
+    --text-muted:#93A0AC;
+    --text-faint:#5D6A75;
+    --accent-amber:#E3A008;
+    --accent-amber-soft:#3A2E10;
+    --accent-lime:#8BC53F;
+    --danger:#D6533F;
+    --danger-soft:#3A2320;
+    --success:#4A9F6E;
+    --success-soft:#1E3327;
+    --font-display:'Bebas Neue',sans-serif;
+    --font-body:'IBM Plex Sans',sans-serif;
+    --font-mono:'IBM Plex Mono',monospace;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg-base);
+    color:var(--text-primary);
+    font-family:var(--font-body);
+    -webkit-tap-highlight-color:transparent;
+    min-height:100vh;
+  }
+  ::selection{background:var(--accent-amber);color:#1B1F24;}
+  button{font-family:inherit;}
+  input,select,textarea{font-family:inherit;}
+  a{color:var(--accent-amber);}
+
+  /* ---------- Utility ---------- */
+  .hidden{display:none !important;}
+  .label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    display:block;
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:16px;}
+  input[type=text],input[type=number],input[type=email],input[type=password],select,textarea{
+    width:100%;
+    background:var(--bg-input);
+    border:1px solid var(--line);
+    color:var(--text-primary);
+    padding:11px 12px;
+    border-radius:var(--radius);
+    font-size:15px;
+  }
+  textarea{resize:vertical;min-height:70px;}
+  input:focus,select:focus,textarea:focus{
+    outline:none;
+    border-color:var(--accent-amber);
+    box-shadow:0 0 0 3px rgba(227,160,8,.15);
+  }
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:12px 18px;border-radius:var(--radius);border:1px solid transparent;
+    font-weight:600;font-size:14px;cursor:pointer;transition:transform .06s ease, opacity .15s ease;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--accent-amber);color:#1B1400;}
+  .btn-primary:hover{opacity:.92;}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--text-primary);}
+  .btn-ghost:hover{border-color:var(--text-muted);}
+  .btn-danger{background:var(--danger-soft);color:#FF9A85;border-color:#5A2E27;}
+  .btn-block{width:100%;}
+  .btn-sm{padding:7px 12px;font-size:12.5px;}
+
+  /* ---------- Login ---------- */
+  #screen-login{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(227,160,8,.07), transparent 40%),
+      var(--bg-base);
+  }
+  .login-card{
+    width:100%;max-width:400px;background:var(--bg-panel);border:1px solid var(--line);
+    border-radius:10px;padding:32px 28px 28px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:5px;background:var(--accent-amber);
+    display:flex;align-items:center;justify-content:center;color:#1B1400;font-family:var(--font-display);
+    font-size:20px;flex-shrink:0;
+  }
+  .brand-name{font-family:var(--font-display);font-size:22px;letter-spacing:.02em;line-height:1;}
+  .brand-sub{color:var(--text-muted);font-size:12.5px;margin:2px 0 26px 44px;}
+  .tabs{display:flex;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;}
+  .tab{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;background:var(--bg-input);}
+  .tab.active{background:var(--accent-amber);color:#1B1400;}
+  #login-error{color:#FF9A85;font-size:13px;margin-top:10px;min-height:18px;}
+  .role-choice{display:flex;gap:8px;}
+  .role-choice label{
+    flex:1;border:1px solid var(--line);border-radius:var(--radius);padding:10px;text-align:center;
+    font-size:13px;cursor:pointer;color:var(--text-muted);
+  }
+  .role-choice input{display:none;}
+  .role-choice input:checked + span{color:var(--accent-amber);font-weight:600;}
+  .role-choice label:has(input:checked){border-color:var(--accent-amber);background:var(--accent-amber-soft);}
+
+  /* ---------- App shell ---------- */
+  #app{display:none;min-height:100vh;}
+  #app.active{display:flex;}
+  .sidebar{
+    width:220px;flex-shrink:0;background:var(--bg-panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:var(--radius);
+    color:var(--text-muted);font-size:14px;font-weight:500;cursor:pointer;margin-bottom:2px;
+  }
+  .nav-item:hover{background:var(--bg-panel-raised);}
+  .nav-item.active{background:var(--accent-amber-soft);color:var(--accent-amber);}
+  .nav-icon{width:18px;text-align:center;font-family:var(--font-mono);}
+  .sidebar-footer{margin-top:auto;padding-top:14px;border-top:1px solid var(--line-soft);}
+  .user-chip{font-size:12.5px;color:var(--text-muted);margin-bottom:10px;word-break:break-all;}
+  .main{flex:1;min-width:0;padding:26px 28px 60px;max-width:1100px;}
+  .page-title{font-family:var(--font-display);font-size:30px;letter-spacing:.01em;margin:0 0 4px;}
+  .page-sub{color:var(--text-muted);font-size:13.5px;margin:0 0 24px;}
+
+  /* Sync status pill */
+  .sync-pill{
+    display:inline-flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:11px;
+    padding:6px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-muted);
+  }
+  .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);}
+  .sync-pill.online .sync-dot{background:var(--success);box-shadow:0 0 0 3px var(--success-soft);}
+  .sync-pill.offline .sync-dot{background:var(--danger);box-shadow:0 0 0 3px var(--danger-soft);}
+  .sync-pill.pending .sync-dot{background:var(--accent-amber);box-shadow:0 0 0 3px var(--accent-amber-soft);}
+
+  /* ---------- Ticket card (signature element) ---------- */
+  .ticket{
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:18px;
+  }
+  .ticket-head{
+    display:flex;justify-content:space-between;align-items:flex-start;padding:16px 18px;gap:12px;
+  }
+  .ticket-perf{
+    height:0;border-top:2px dashed var(--line);position:relative;margin:0 0;
+  }
+  .ticket-perf::before,.ticket-perf::after{
+    content:"";position:absolute;top:-8px;width:16px;height:16px;border-radius:50%;background:var(--bg-base);
+  }
+  .ticket-perf::before{left:-8px;}
+  .ticket-perf::after{right:-8px;}
+  .ticket-body{padding:16px 18px 18px;}
+
+  /* ---------- Form sections (field capture) ---------- */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:520px){.grid-2{grid-template-columns:1fr;}}
+  .section-title{
+    font-family:var(--font-mono);font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--accent-amber);margin:22px 0 12px;padding-top:16px;border-top:1px solid var(--line-soft);
+  }
+  .section-title:first-of-type{border-top:none;margin-top:0;padding-top:0;}
+  .gps-box{
+    background:var(--bg-input);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  }
+  .gps-readout{font-family:var(--font-mono);font-size:13px;color:var(--text-primary);}
+  .gps-readout .muted{color:var(--text-faint);}
+
+  .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  @media(max-width:480px){.photo-grid{grid-template-columns:1fr;}}
+  .photo-slot{
+    border:1px dashed var(--line);border-radius:var(--radius);aspect-ratio:1/1;position:relative;
+    overflow:hidden;background:var(--bg-input);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .photo-slot img{width:100%;height:100%;object-fit:cover;}
+  .photo-slot .placeholder{text-align:center;color:var(--text-faint);font-size:12px;padding:8px;}
+  .photo-slot .placeholder .icon{font-size:22px;display:block;margin-bottom:6px;}
+  .photo-slot input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .photo-slot .tag{
+    position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-family:var(--font-mono);
+    font-size:10px;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.05em;
+  }
+  .photo-slot .clear-btn{
+    position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border-radius:3px;
+    width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;z-index:2;
+  }
+
+  /* ---------- Records table ---------- */
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+  .toolbar input,.toolbar select{width:auto;min-width:140px;}
+  .stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;}
+  @media(max-width:760px){.stat-row{grid-template-columns:repeat(2,1fr);}}
+  .stat-card{background:var(--bg-panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
+  .stat-num{font-family:var(--font-display);font-size:28px;color:var(--accent-amber);line-height:1;}
+  .stat-label{font-size:11.5px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  thead th{
+    text-align:left;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--text-faint);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  tbody td{padding:10px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle;}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover{background:var(--bg-panel-raised);}
+  .badge{font-family:var(--font-mono);font-size:10.5px;padding:3px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;}
+  .badge-ok{background:var(--success-soft);color:var(--success);}
+  .badge-pending{background:var(--accent-amber-soft);color:var(--accent-amber);}
+  .badge-alert{background:var(--danger-soft);color:#FF9A85;}
+  .verif-box{border-radius:var(--radius);padding:9px 12px;font-size:12.5px;font-family:var(--font-mono);}
+  .verif-ok{background:var(--success-soft);color:var(--success);}
+  .verif-alert{background:var(--danger-soft);color:#FF9A85;}
+  .table-wrap{overflow-x:auto;background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:6px;}
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(10,12,14,.72);display:flex;align-items:flex-start;justify-content:center;
+    padding:30px 16px;z-index:100;overflow-y:auto;
+  }
+  .modal{
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;max-width:640px;width:100%;
+    padding:22px 24px 24px;
+  }
+  .modal-close{float:right;background:transparent;color:var(--text-muted);border:none;font-size:20px;cursor:pointer;}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin:16px 0;font-size:13.5px;}
+  .detail-grid .k{color:var(--text-faint);font-family:var(--font-mono);font-size:11px;text-transform:uppercase;}
+  .detail-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+  .detail-photos img{width:100%;border-radius:6px;aspect-ratio:1/1;object-fit:cover;background:var(--bg-input);}
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg-panel-raised);
+    border:1px solid var(--line);padding:12px 18px;border-radius:8px;font-size:13.5px;z-index:200;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .toast.success{border-color:#2E5C43;color:#B7E4C7;}
+  .toast.error{border-color:#5A2E27;color:#FFC1B0;}
+
+  #banner-prueba{
+    display:none;position:sticky;top:0;left:0;right:0;z-index:150;
+    background:repeating-linear-gradient(135deg, var(--accent-amber), var(--accent-amber) 12px, #1B1400 12px, #1B1400 24px);
+    color:#1B1400;font-family:var(--font-mono);font-weight:700;font-size:12.5px;text-align:center;
+    padding:7px 10px;letter-spacing:.03em;
+  }
+  body.modo-prueba #banner-prueba{display:block;}
+  body.modo-prueba .sidebar{border-right-color:var(--accent-amber);}
+  body.modo-prueba .brand-name::after{content:" · PRUEBA";color:var(--accent-amber);font-size:11px;}
+
+  @media(max-width:820px){
+    #app.active{flex-direction:column;}
+    .sidebar{width:100%;height:auto;position:relative;flex-direction:row;overflow-x:auto;padding:10px 12px;gap:4px;}
+    .sidebar-footer{display:none;}
+    .nav-item{flex-shrink:0;margin-bottom:0;}
+    .main{padding:18px 16px 50px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="banner-prueba">⚠ MODO PRUEBA — estos datos son de práctica y no afectan la operación real</div>
+
+<!-- ============ LOGIN ============ -->
+<div id="screen-login">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark">B</div>
+      <div class="brand-name">BITÁCORA DE MAQUINARIA</div>
+    </div>
+    <div class="brand-sub">Auditoría de remoción de escombros</div>
+
+    <div class="tabs">
+      <div class="tab active" id="tab-signin">Ingresar</div>
+      <div class="tab" id="tab-signup">Crear cuenta</div>
+    </div>
+
+    <form id="form-login">
+      <div class="field">
+        <label class="label">Correo</label>
+        <input type="email" id="login-email" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label class="label">Contraseña</label>
+        <input type="password" id="login-password" required autocomplete="current-password" minlength="6">
+      </div>
+      <div class="field hidden" id="signup-name-field">
+        <label class="label">Nombre completo</label>
+        <input type="text" id="signup-name">
+      </div>
+      <div class="field hidden" id="signup-role-field">
+        <label class="label">Tipo de cuenta</label>
+        <div class="role-choice">
+          <label><input type="radio" name="signup-role" value="campo" checked><span>Personal de campo</span></label>
+          <label><input type="radio" name="signup-role" value="admin_solicitado"><span>Administrador</span></label>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="btn-login-submit">Ingresar</button>
+      <div id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div class="sidebar">
+    <div class="brand" style="margin-bottom:22px;">
+      <div class="brand-mark">B</div>
+      <div class="brand-name" style="font-size:17px;">BITÁCORA</div>
+    </div>
+    <div class="nav-item" data-view="captura" id="nav-captura"><span class="nav-icon">＋</span> Nuevo registro</div>
+    <div class="nav-item" data-view="mis-registros" id="nav-mis-registros"><span class="nav-icon">☰</span> Mis registros</div>
+    <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
+    <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
+    <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
+    <div class="sidebar-footer">
+      <div class="sync-pill" id="sync-pill"><span class="sync-dot"></span><span id="sync-text">Conectando…</span></div>
+      <div class="user-chip" id="user-chip" style="margin-top:12px;"></div>
+      <button class="btn btn-ghost btn-sm btn-block" id="btn-modo-prueba" style="margin-bottom:8px;">Activar modo prueba</button>
+      <button class="btn btn-ghost btn-sm btn-block" id="btn-logout">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ---- VIEW: Captura de campo ---- -->
+    <div class="view" id="view-captura">
+      <h1 class="page-title">Nuevo registro</h1>
+      <p class="page-sub">Registra el uso de maquinaria. Si no hay señal, el registro se guarda en el equipo y se sincroniza automáticamente al recuperar conexión.</p>
+
+      <div class="ticket">
+        <div class="ticket-body">
+          <form id="form-captura">
+            <div class="section-title">Identificación</div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="label">Tipo de maquinaria</label>
+                <select id="f-tipo" required>
+                  <option value="">Seleccionar…</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="label">Placa / número de unidad</label>
+                <input type="text" id="f-codigo" placeholder="Ej. EXC-014, propio del contratista" required>
+              </div>
+              <div class="field">
+                <label class="label">Empresa contratista</label>
+                <input type="text" id="f-contratista" required>
+              </div>
+              <div class="field">
+                <label class="label">Operador</label>
+                <input type="text" id="f-operador" required>
+              </div>
+            </div>
+
+            <div class="section-title">Mediciones</div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="label">Lectura de horómetro (h)</label>
+                <input type="number" step="0.1" id="f-horometro" required>
+              </div>
+              <div class="field">
+                <label class="label">Horas trabajadas en la jornada</label>
+                <input type="number" step="0.1" id="f-horas" required>
+              </div>
+              <div class="field">
+                <label class="label">Combustible suministrado (litros)</label>
+                <input type="number" step="0.1" id="f-combustible">
+              </div>
+              <div class="field">
+                <label class="label">Volumen de escombro removido (m³)</label>
+                <input type="number" step="0.1" id="f-volumen" required>
+              </div>
+            </div>
+
+            <div class="section-title">Ubicación</div>
+            <div class="field">
+              <label class="label">Sitio de obra declarado</label>
+              <select id="f-sitio" required>
+                <option value="">Seleccionar sitio…</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="gps-box">
+                <div class="gps-readout" id="gps-readout"><span class="muted">Sin capturar aún</span></div>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-gps">Capturar ubicación GPS</button>
+              </div>
+              <div id="gps-verificacion" style="margin-top:8px;"></div>
+            </div>
+            <div class="field">
+              <label class="label">Referencia / dirección (opcional)</label>
+              <input type="text" id="f-referencia" placeholder="Ej. Av. Bolívar cruce con calle 5, sector El Paraíso">
+            </div>
+
+            <div class="section-title">Evidencia fotográfica</div>
+            <div class="photo-grid">
+              <label class="photo-slot" id="slot-antes">
+                <span class="tag">Antes</span>
+                <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
+                <input type="file" accept="image/*" capture="environment" data-slot="antes">
+              </label>
+              <label class="photo-slot" id="slot-durante">
+                <span class="tag">Durante</span>
+                <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
+                <input type="file" accept="image/*" capture="environment" data-slot="durante">
+              </label>
+              <label class="photo-slot" id="slot-despues">
+                <span class="tag">Después</span>
+                <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
+                <input type="file" accept="image/*" capture="environment" data-slot="despues">
+              </label>
+            </div>
+
+            <div class="section-title">Observaciones</div>
+            <div class="field">
+              <textarea id="f-notas" placeholder="Notas adicionales, incidencias, condiciones de acceso, etc."></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="btn-guardar" style="margin-top:8px;">Guardar registro</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Mis registros (campo) ---- -->
+    <div class="view hidden" id="view-mis-registros">
+      <h1 class="page-title">Mis registros</h1>
+      <p class="page-sub">Historial de registros capturados desde este dispositivo.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Máquina</th><th>Contratista</th><th>Vol. m³</th><th>Estado</th></tr></thead>
+          <tbody id="tbody-mis-registros"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Panel admin ---- -->
+    <div class="view hidden" id="view-panel">
+      <h1 class="page-title">Panel de control</h1>
+      <p class="page-sub">Consolidado de todos los registros de campo.</p>
+
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Registros</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-volumen">0</div><div class="stat-label">m³ removidos</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-horas">0</div><div class="stat-label">Horas máquina</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-maquinas">0</div><div class="stat-label">Máquinas activas</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-alertas" style="color:var(--danger);">0</div><div class="stat-label">Con alertas</div></div>
+      </div>
+
+      <div class="toolbar">
+        <input type="text" id="filtro-texto" placeholder="Buscar por código, contratista u operador…">
+        <select id="filtro-contratista"><option value="">Todos los contratistas</option></select>
+        <select id="filtro-tipo"><option value="">Todas las máquinas</option></select>
+        <select id="filtro-alerta">
+          <option value="">Todos los registros</option>
+          <option value="alerta">Solo con alertas</option>
+          <option value="ubicacion">Fuera de zona</option>
+          <option value="reloj">Reloj sospechoso</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" id="btn-export-csv">Exportar CSV</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Máquina</th><th>Contratista</th><th>Operador</th><th>Horas</th><th>Comb. (L)</th><th>Vol. m³</th><th>Fotos</th><th>Verificación</th><th>Capturó</th></tr></thead>
+          <tbody id="tbody-panel"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Usuarios (admin) ---- -->
+    <div class="view hidden" id="view-usuarios">
+      <h1 class="page-title">Usuarios</h1>
+      <p class="page-sub">Asigna el rol de administrador a las cuentas que lo requieran.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nombre</th><th>Correo</th><th>Rol actual</th><th>Acción</th></tr></thead>
+          <tbody id="tbody-usuarios"></tbody>
+        </table>
+      </div>
+
+      <h1 class="page-title" style="font-size:24px;margin-top:32px;">Administradores pre-autorizados</h1>
+      <p class="page-sub">Agrega el correo de alguien que aún no tiene cuenta: en cuanto se registre, se convertirá en administrador automáticamente, sin pasos adicionales.</p>
+      <div class="ticket" style="max-width:480px;">
+        <div class="ticket-body">
+          <form id="form-preautorizar">
+            <div class="field">
+              <label class="label">Correo a pre-autorizar</label>
+              <input type="email" id="pa-email" placeholder="nombre@empresa.com" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Pre-autorizar como administrador</button>
+          </form>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr><th>Correo pre-autorizado</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tbody-preautorizados"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Sitios de obra (admin) ---- -->
+    <div class="view hidden" id="view-sitios">
+      <h1 class="page-title">Sitios de obra</h1>
+      <p class="page-sub">Registra las coordenadas y el radio permitido de cada sitio. El personal de campo deberá declarar el sitio al capturar un registro, y la app verificará que su GPS coincida.</p>
+
+      <div class="ticket" style="max-width:520px;">
+        <div class="ticket-body">
+          <form id="form-sitio">
+            <div class="field">
+              <label class="label">Nombre del sitio / obra</label>
+              <input type="text" id="s-nombre" placeholder="Ej. Escombrera Municipal Norte" required>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="label">Latitud</label>
+                <input type="number" step="0.000001" id="s-lat" required>
+              </div>
+              <div class="field">
+                <label class="label">Longitud</label>
+                <input type="number" step="0.000001" id="s-lng" required>
+              </div>
+            </div>
+            <div class="field">
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-sitio-gps">Usar mi ubicación actual</button>
+            </div>
+            <div class="field">
+              <label class="label">Radio permitido (metros)</label>
+              <input type="number" step="1" id="s-radio" value="250" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Agregar sitio</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:18px;">
+        <table>
+          <thead><tr><th>Sitio</th><th>Coordenadas</th><th>Radio</th><th></th></tr></thead>
+          <tbody id="tbody-sitios"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="modal-root"></div>
+
+<script type="module">
+/* =========================================================================
+   CONFIGURACIÓN DE FIREBASE
+   Proyecto: bitacora-maquinaria-47940
+   ========================================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDSBpgDQSHUUjJrAijcbMguA5vgAy2s9vg",
+  authDomain: "bitacora-maquinaria-47940.firebaseapp.com",
+  projectId: "bitacora-maquinaria-47940",
+  storageBucket: "bitacora-maquinaria-47940.firebasestorage.app",
+  messagingSenderId: "66030888970",
+  appId: "1:66030888970:web:cbdd32999b59d2c3c9d7f3"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, updateDoc, getDoc, getDocs, collection,
+  addDoc, deleteDoc, serverTimestamp, enableIndexedDbPersistence, onSnapshot, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+try { await enableIndexedDbPersistence(db); } catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
+
+/* =========================================================================
+   COLA LOCAL DE FOTOS (IndexedDB) — para cuando no hay señal
+   ========================================================================= */
+const PHOTO_DB_NAME = "bitacora-fotos";
+const PHOTO_STORE = "pendientes";
+
+function openPhotoDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(PHOTO_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(PHOTO_STORE, { keyPath: "id" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function savePendingPhoto(id, blob, meta){
+  const db2 = await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db2.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).put({ id, blob, meta });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function getAllPendingPhotos(){
+  const db2 = await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db2.transaction(PHOTO_STORE, "readonly");
+    const req = tx.objectStore(PHOTO_STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function deletePendingPhoto(id){
+  const db2 = await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db2.transaction(PHOTO_STORE, "readwrite");
+    tx.objectStore(PHOTO_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function compressImage(file, maxWidth = 1000, quality = 0.6){
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Comprime la foto y le quema encima fecha/hora + coordenadas + precisión GPS,
+   como prueba visual de dónde y cuándo se tomó (estilo "geotag camera"). */
+function compressAndWatermark(file, meta, maxWidth = 1000, quality = 0.65){
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = img.width * scale, h = img.height * scale;
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const fecha = new Date(meta.timestamp);
+      const lineas = [
+        fecha.toLocaleDateString("es-VE", { day:"2-digit", month:"2-digit", year:"numeric" }) + "  " + fecha.toLocaleTimeString("es-VE", { hour:"2-digit", minute:"2-digit", second:"2-digit" }),
+        meta.lat != null ? `${meta.lat.toFixed(6)}, ${meta.lng.toFixed(6)}  ±${Math.round(meta.precision)}m` : "Sin GPS disponible",
+        meta.etiqueta || ""
+      ].filter(Boolean);
+
+      const padding = Math.max(8, w * 0.02);
+      const fontSize = Math.max(11, Math.round(w * 0.028));
+      ctx.font = `${fontSize}px 'IBM Plex Mono', monospace`;
+      const lineHeight = fontSize * 135 / 1000 * 10;
+      const bandHeight = lineas.length * (fontSize + 6) + padding;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, h - bandHeight, w, bandHeight);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textBaseline = "top";
+      lineas.forEach((linea, i) => {
+        ctx.fillText(linea, padding, h - bandHeight + padding/2 + i * (fontSize + 6));
+      });
+
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function syncPendingPhotos(){
+  if (!navigator.onLine) return;
+  let pendientes;
+  try { pendientes = await getAllPendingPhotos(); } catch(e){ return; }
+  for (const p of pendientes){
+    try{
+      const carpeta = p.meta.carpeta || carpetaFotos();
+      const coleccion = p.meta.coleccion || col("registros");
+      const storageRef = ref(storage, `${carpeta}/${p.meta.registroId}/${p.meta.slot}_${p.id}.jpg`);
+      await uploadBytes(storageRef, p.blob);
+      const url = await getDownloadURL(storageRef);
+      const regRef = doc(db, coleccion, p.meta.registroId);
+      await updateDoc(regRef, { [`fotos.${p.meta.slot}.url`]: url, [`fotos.${p.meta.slot}.estado`]: "sincronizado" });
+      await deletePendingPhoto(p.id);
+    } catch(err){
+      console.warn("No se pudo sincronizar foto pendiente, se reintentará:", err.message);
+    }
+  }
+  refreshSyncPill();
+}
+
+/* =========================================================================
+   CATÁLOGO DE MAQUINARIA
+   Cada tipo tiene un codename corto (tipo+modelo) para identificarlo rápido
+   en tablas, filtros y reportes. El nombre completo se guarda igual en cada
+   registro, así que nada se pierde de la descripción original.
+   ========================================================================= */
+const CATALOGO_MAQUINARIA = [
+  { codigo: "CF-953",        nombre: "Cargador frontal sobre orugas tipo CAT 953" },
+  { codigo: "CF-963",        nombre: "Cargador frontal sobre orugas tipo CAT 963" },
+  { codigo: "CF-950",        nombre: "Cargador frontal sobre cauchos tipo CAT 950" },
+  { codigo: "CF-966",        nombre: "Cargador frontal sobre cauchos tipo CAT 966" },
+  { codigo: "EXC-20-CUC",    nombre: "Excavadora hidráulica 20–22 t con cucharón" },
+  { codigo: "EXC-20-MAR",    nombre: "Excavadora hidráulica 20–22 t con martillo" },
+  { codigo: "EXC-30-CUC",    nombre: "Excavadora hidráulica 30–35 t con cucharón" },
+  { codigo: "EXC-30-MAR",    nombre: "Excavadora hidráulica 30–35 t con martillo" },
+  { codigo: "RETRO-420-CUC", nombre: "Retroexcavadora CAT 420 con cucharón" },
+  { codigo: "RETRO-420-MAR", nombre: "Retroexcavadora CAT 420 con martillo" },
+  { codigo: "MINI-S650",     nombre: "Minicargador tipo Bobcat S650" },
+  { codigo: "VOLT-9",        nombre: "Camión volteo 9 m³" },
+  { codigo: "VOLT-15",       nombre: "Camión volteo 15 m³" },
+  { codigo: "VOLT-18",       nombre: "Camión volteo 18 m³" },
+  { codigo: "CIST-10K",      nombre: "Camión cisterna 10.000 L" },
+  { codigo: "GRUA-ART-M",    nombre: "Camión grúa articulada mediana" },
+  { codigo: "LOWBOY-35",     nombre: "Tractomula con lowboy 35–40 t" },
+  { codigo: "LOWBOY-50",     nombre: "Tractomula con lowboy 50–60 t" },
+  { codigo: "TORRE-LUZ",     nombre: "Torre de iluminación autónoma 4 lámparas - 25.5 HP" },
+  { codigo: "PLANTA-50",     nombre: "Planta eléctrica móvil 50 KVA" },
+  { codigo: "TRAC-D7",       nombre: "Tractor sobre orugas tipo CAT D7, hoja Semi-U, sin ripper" },
+  { codigo: "TRAC-D8",       nombre: "Tractor sobre orugas tipo CAT D8, hoja Semi-U, sin ripper" },
+  { codigo: "TRAC-D9",       nombre: "Tractor sobre orugas tipo CAT D9, hoja Semi-U, sin ripper" },
+  { codigo: "VIBRO-10",      nombre: "Vibrocompactadora autopropulsada 10 t" },
+  { codigo: "GRUA-PATIO-3",  nombre: "Grúa hidráulica de patio 3 t" },
+  { codigo: "GRUA-PATIO-7",  nombre: "Grúa hidráulica de patio 7 t" },
+  { codigo: "GRUA-RT-20",    nombre: "Grúa hidráulica Rough Terrain 20 t" },
+  { codigo: "GRUA-RT-60",    nombre: "Grúa hidráulica Rough Terrain 60 t" },
+  { codigo: "GRUA-RT-75",    nombre: "Grúa hidráulica Rough Terrain 75 t" },
+  { codigo: "GRUA-AT-110",   nombre: "Grúa hidráulica All Terrain 110 t" },
+  { codigo: "GRUA-CEL-50",   nombre: "Grúa de celosía sobre orugas 50 t" },
+  { codigo: "GRUA-TEL-RT-50",nombre: "Grúa telescópica Rough Terrain 50 t" },
+  { codigo: "GRUA-AT-130",   nombre: "Grúa hidráulica All Terrain 130 t" }
+];
+function buscarMaquina(codigo){ return CATALOGO_MAQUINARIA.find(m => m.codigo === codigo); }
+function poblarSelectMaquinaria(){
+  const sel = $("#f-tipo");
+  sel.innerHTML = `<option value="">Seleccionar…</option>` +
+    CATALOGO_MAQUINARIA.map(m => `<option value="${m.codigo}">${m.codigo} — ${m.nombre}</option>`).join("");
+}
+
+/* =========================================================================
+   MODO PRUEBA
+   Es una preferencia por dispositivo (localStorage), no una configuración
+   global: mientras un inspector prueba la app en su celular, el resto del
+   equipo sigue viendo y guardando en los datos reales sin cruzarse.
+   Los registros, sitios y fotos de prueba van a colecciones/carpetas
+   separadas ("_prueba") — nunca tocan la colección real.
+   ========================================================================= */
+let modoPrueba = localStorage.getItem("bitacora_modo_prueba") === "1";
+function col(nombre){ return modoPrueba ? `${nombre}_prueba` : nombre; }
+function carpetaFotos(){ return modoPrueba ? "fotos_prueba" : "fotos"; }
+function aplicarBannerModoPrueba(){
+  document.body.classList.toggle("modo-prueba", modoPrueba);
+  const btn = $("#btn-modo-prueba");
+  if (btn) btn.textContent = modoPrueba ? "Salir del modo prueba" : "Activar modo prueba";
+}
+
+/* =========================================================================
+   ESTADO GENERAL
+   ========================================================================= */
+let currentUser = null;
+let currentRole = null;
+let currentUserNombre = "";
+let capturaGPS = null;
+let fotosSeleccionadas = { antes: null, durante: null, despues: null };
+let fotosMeta = { antes: null, durante: null, despues: null }; // {lat,lng,precision,timestamp}
+let unsubRegistros = null;
+let cacheRegistros = [];
+let cacheSitios = [];
+
+const $ = (sel) => document.querySelector(sel);
+const $all = (sel) => document.querySelectorAll(sel);
+poblarSelectMaquinaria();
+aplicarBannerModoPrueba();
+
+/* Distancia entre dos coordenadas (metros) — fórmula de Haversine */
+function distanciaMetros(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* Obtiene una lectura GPS fresca (sin caché) envuelta en promesa */
+function obtenerGPSFresco(timeout = 10000){
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error("Geolocalización no soportada")); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, precision: pos.coords.accuracy }),
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout, maximumAge: 0 }
+    );
+  });
+}
+
+function showToast(msg, type = "success"){
+  const t = document.createElement("div");
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* =========================================================================
+   ESTADO DE CONEXIÓN
+   ========================================================================= */
+async function refreshSyncPill(){
+  const pill = $("#sync-pill");
+  const text = $("#sync-text");
+  let pendientesFotos = 0;
+  try { pendientesFotos = (await getAllPendingPhotos()).length; } catch(e){}
+  if (!navigator.onLine){
+    pill.className = "sync-pill offline";
+    text.textContent = "Sin conexión — guardando localmente";
+  } else if (pendientesFotos > 0){
+    pill.className = "sync-pill pending";
+    text.textContent = `Sincronizando (${pendientesFotos} foto${pendientesFotos>1?'s':''})…`;
+  } else {
+    pill.className = "sync-pill online";
+    text.textContent = "En línea — sincronizado";
+  }
+}
+window.addEventListener("online", () => { refreshSyncPill(); syncPendingPhotos(); });
+window.addEventListener("offline", refreshSyncPill);
+setInterval(() => { refreshSyncPill(); syncPendingPhotos(); }, 20000);
+
+/* =========================================================================
+   AUTENTICACIÓN
+   ========================================================================= */
+let modoSignup = false;
+$("#tab-signin").onclick = () => { modoSignup = false; $("#tab-signin").classList.add("active"); $("#tab-signup").classList.remove("active"); $("#signup-name-field").classList.add("hidden"); $("#signup-role-field").classList.add("hidden"); $("#btn-login-submit").textContent = "Ingresar"; };
+$("#tab-signup").onclick = () => { modoSignup = true; $("#tab-signup").classList.add("active"); $("#tab-signin").classList.remove("active"); $("#signup-name-field").classList.remove("hidden"); $("#signup-role-field").classList.remove("hidden"); $("#btn-login-submit").textContent = "Crear cuenta"; };
+
+$("#form-login").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#login-email").value.trim();
+  const password = $("#login-password").value;
+  $("#login-error").textContent = "";
+  $("#btn-login-submit").disabled = true;
+  try{
+    if (modoSignup){
+      const nombre = $("#signup-name").value.trim() || email;
+      const rolSolicitado = document.querySelector('input[name="signup-role"]:checked').value;
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Si el correo fue pre-autorizado por un admin existente (pestaña "Usuarios"),
+      // la cuenta nace directamente como administrador. Si no, nace como "campo" y,
+      // si pidió ser admin, queda marcada para aprobación manual.
+      let esPreautorizado = false;
+      try{
+        const preauth = await getDoc(doc(db, "admins_autorizados", cred.user.email));
+        esPreautorizado = preauth.exists();
+      } catch(err){ /* sin permisos de lectura o sin conexión: se crea como campo */ }
+
+      await setDoc(doc(db, "usuarios", cred.user.uid), {
+        nombre, email: cred.user.email,
+        role: esPreautorizado ? "admin" : "campo",
+        rolSolicitado: (!esPreautorizado && rolSolicitado === "admin_solicitado") ? "admin" : null,
+        creadoEn: serverTimestamp()
+      });
+
+      if (esPreautorizado){
+        showToast("Cuenta creada como administrador (tu correo estaba pre-autorizado).", "success");
+      } else if (rolSolicitado === "admin_solicitado"){
+        showToast("Cuenta creada. Tu solicitud de administrador quedó pendiente de aprobación.", "success");
+      }
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+  } catch(err){
+    $("#login-error").textContent = traducirErrorAuth(err.code);
+  } finally {
+    $("#btn-login-submit").disabled = false;
+  }
+});
+
+function traducirErrorAuth(code){
+  const map = {
+    "auth/invalid-email": "Correo inválido.",
+    "auth/user-not-found": "No existe una cuenta con ese correo.",
+    "auth/wrong-password": "Contraseña incorrecta.",
+    "auth/invalid-credential": "Correo o contraseña incorrectos.",
+    "auth/email-already-in-use": "Ya existe una cuenta con ese correo.",
+    "auth/weak-password": "La contraseña debe tener al menos 6 caracteres."
+  };
+  return map[code] || "Ocurrió un error. Intenta de nuevo.";
+}
+
+$("#btn-logout").onclick = () => signOut(auth);
+
+$("#btn-modo-prueba").onclick = () => {
+  const activando = !modoPrueba;
+  const mensaje = activando
+    ? "Vas a entrar en MODO PRUEBA: todo lo que captures irá a datos de práctica, separados de la operación real. Puedes crear registros y sitios de prueba libremente."
+    : "Vas a salir del modo prueba y volver a los datos reales de la operación.";
+  if (!confirm(mensaje)) return;
+  localStorage.setItem("bitacora_modo_prueba", activando ? "1" : "0");
+  location.reload();
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (user){
+    currentUser = user;
+    const userDoc = await getDoc(doc(db, "usuarios", user.uid));
+    currentRole = userDoc.exists() ? userDoc.data().role : "campo";
+    $("#screen-login").style.display = "none";
+    $("#app").classList.add("active");
+    $("#user-chip").textContent = `${userDoc.data()?.nombre || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
+    if (currentRole === "admin"){
+      $("#nav-panel").classList.remove("hidden");
+      $("#nav-usuarios").classList.remove("hidden");
+      $("#nav-sitios").classList.remove("hidden");
+      cargarPanelAdmin();
+      cargarUsuarios();
+    }
+    cargarSitios();
+    cargarMisRegistros();
+    goToView("captura");
+    refreshSyncPill();
+    syncPendingPhotos();
+  } else {
+    currentUser = null; currentRole = null;
+    if (unsubRegistros) unsubRegistros();
+    $("#screen-login").style.display = "flex";
+    $("#app").classList.remove("active");
+  }
+});
+
+/* =========================================================================
+   NAVEGACIÓN
+   ========================================================================= */
+function goToView(name){
+  $all(".view").forEach(v => v.classList.add("hidden"));
+  $all(".nav-item").forEach(n => n.classList.remove("active"));
+  $(`#view-${name}`).classList.remove("hidden");
+  $(`#nav-${name}`)?.classList.add("active");
+}
+$all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
+
+/* =========================================================================
+   CAPTURA GPS
+   ========================================================================= */
+$("#btn-gps").onclick = async () => {
+  if (!$("#f-sitio").value){ showToast("Primero selecciona el sitio de obra declarado.", "error"); return; }
+  $("#gps-readout").innerHTML = `<span class="muted">Obteniendo ubicación (GPS en vivo, sin caché)…</span>`;
+  $("#gps-verificacion").innerHTML = "";
+  try{
+    capturaGPS = await obtenerGPSFresco();
+    $("#gps-readout").innerHTML = `${capturaGPS.lat.toFixed(6)}, ${capturaGPS.lng.toFixed(6)} <span class="muted">±${Math.round(capturaGPS.precision)}m</span>`;
+    verificarContraSitio();
+  } catch(err){
+    $("#gps-readout").innerHTML = `<span class="muted">No se pudo obtener ubicación (${err.message})</span>`;
+  }
+};
+
+function verificarContraSitio(){
+  const sitioId = $("#f-sitio").value;
+  const sitio = cacheSitios.find(s => s.id === sitioId);
+  const box = $("#gps-verificacion");
+  if (!sitio || !capturaGPS){ box.innerHTML = ""; return; }
+  const distancia = distanciaMetros(capturaGPS.lat, capturaGPS.lng, sitio.lat, sitio.lng);
+  if (distancia <= sitio.radio){
+    box.innerHTML = `<div class="verif-box verif-ok">✓ Dentro del sitio "${sitio.nombre}" (a ${Math.round(distancia)} m del centro registrado)</div>`;
+  } else {
+    box.innerHTML = `<div class="verif-box verif-alert">⚠ A ${Math.round(distancia)} m de "${sitio.nombre}" — fuera del radio permitido de ${sitio.radio} m. El registro se guardará marcado para revisión.</div>`;
+  }
+}
+$("#f-sitio").addEventListener("change", verificarContraSitio);
+
+/* =========================================================================
+   CAPTURA DE FOTOS
+   ========================================================================= */
+function attachPhotoInputListener(input){
+  input.addEventListener("change", async (e) => {
+    const slot = input.dataset.slot;
+    const file = e.target.files[0];
+    if (!file) return;
+    const container = $(`#slot-${slot}`);
+    container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder">Ubicando y sellando foto…</span>`;
+
+    let gps = null;
+    try { gps = await obtenerGPSFresco(8000); } catch(err){ /* seguimos sin GPS, se marcará como sin ubicación */ }
+    const timestamp = new Date().toISOString();
+    const meta = { lat: gps?.lat ?? null, lng: gps?.lng ?? null, precision: gps?.precision ?? null, timestamp, etiqueta: slot.toUpperCase() };
+    fotosMeta[slot] = meta;
+
+    const compressed = await compressAndWatermark(file, meta);
+    fotosSeleccionadas[slot] = compressed;
+    const url = URL.createObjectURL(compressed);
+    container.innerHTML = `<span class="tag">${slot}</span><img src="${url}"><span class="clear-btn" data-clear="${slot}">✕</span>`;
+  });
+}
+$all('input[type=file][data-slot]').forEach(attachPhotoInputListener);
+
+document.addEventListener("click", (e) => {
+  if (e.target.dataset && e.target.dataset.clear){
+    const slot = e.target.dataset.clear;
+    fotosSeleccionadas[slot] = null;
+    fotosMeta[slot] = null;
+    e.stopPropagation(); e.preventDefault();
+    const container = $(`#slot-${slot}`);
+    container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
+    attachPhotoInputListener(container.querySelector('input'));
+  }
+}, true);
+
+/* =========================================================================
+   GUARDAR REGISTRO
+   ========================================================================= */
+const UMBRAL_RELOJ_MINUTOS = 10;
+
+$("#form-captura").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (!capturaGPS){
+    showToast("Debes capturar tu ubicación GPS antes de guardar.", "error");
+    return;
+  }
+
+  const btn = $("#btn-guardar");
+  btn.disabled = true; btn.textContent = "Guardando…";
+
+  const sitioId = $("#f-sitio").value;
+  const sitio = cacheSitios.find(s => s.id === sitioId);
+  let distanciaAlSitioM = null, alertaUbicacion = false;
+  if (sitio){
+    distanciaAlSitioM = Math.round(distanciaMetros(capturaGPS.lat, capturaGPS.lng, sitio.lat, sitio.lng));
+    alertaUbicacion = distanciaAlSitioM > sitio.radio;
+  }
+
+  const timestampCapturaLocal = new Date().toISOString();
+  const maquinaCat = buscarMaquina($("#f-tipo").value);
+
+  const registro = {
+    tipoMaquinaCodigo: $("#f-tipo").value,
+    tipoMaquina: maquinaCat ? maquinaCat.nombre : $("#f-tipo").value,
+    codigoMaquina: $("#f-codigo").value.trim(),
+    contratista: $("#f-contratista").value.trim(),
+    operador: $("#f-operador").value.trim(),
+    horometro: parseFloat($("#f-horometro").value) || 0,
+    horasTrabajadas: parseFloat($("#f-horas").value) || 0,
+    combustibleLitros: parseFloat($("#f-combustible").value) || 0,
+    volumenM3: parseFloat($("#f-volumen").value) || 0,
+    ubicacion: capturaGPS,
+    sitioId: sitioId || null,
+    sitioNombre: sitio ? sitio.nombre : null,
+    distanciaAlSitioM,
+    alertaUbicacion,
+    alertaReloj: false,
+    driftRelojMinutos: null,
+    referencia: $("#f-referencia").value.trim(),
+    notas: $("#f-notas").value.trim(),
+    fotos: {
+      antes: { estado: fotosSeleccionadas.antes ? "pendiente" : "sin_foto", url: null, ubicacion: fotosMeta.antes ? { lat: fotosMeta.antes.lat, lng: fotosMeta.antes.lng, precision: fotosMeta.antes.precision } : null, timestamp: fotosMeta.antes?.timestamp || null },
+      durante: { estado: fotosSeleccionadas.durante ? "pendiente" : "sin_foto", url: null, ubicacion: fotosMeta.durante ? { lat: fotosMeta.durante.lat, lng: fotosMeta.durante.lng, precision: fotosMeta.durante.precision } : null, timestamp: fotosMeta.durante?.timestamp || null },
+      despues: { estado: fotosSeleccionadas.despues ? "pendiente" : "sin_foto", url: null, ubicacion: fotosMeta.despues ? { lat: fotosMeta.despues.lat, lng: fotosMeta.despues.lng, precision: fotosMeta.despues.precision } : null, timestamp: fotosMeta.despues?.timestamp || null }
+    },
+    capturadoPor: currentUser.uid,
+    capturadoPorNombre: $("#user-chip").textContent,
+    timestampCaptura: timestampCapturaLocal,
+    creadoEn: serverTimestamp()
+  };
+
+  try{
+    const docRef = await addDoc(collection(db, col("registros")), registro);
+
+    // Verificación de reloj: comparamos la hora que el dispositivo dice que es
+    // contra la hora real que Firebase asignó al guardar (serverTimestamp).
+    try{
+      const snap = await getDoc(docRef);
+      const horaServidor = snap.data().creadoEn?.toDate?.();
+      if (horaServidor){
+        const driftMs = Math.abs(horaServidor.getTime() - new Date(timestampCapturaLocal).getTime());
+        const driftMin = Math.round(driftMs / 60000);
+        if (driftMin > UMBRAL_RELOJ_MINUTOS){
+          await updateDoc(docRef, { alertaReloj: true, driftRelojMinutos: driftMin });
+        }
+      }
+    } catch(err){ console.warn("No se pudo verificar el reloj del servidor:", err.message); }
+
+    // encolar fotos localmente y disparar sincronización
+    for (const slot of ["antes","durante","despues"]){
+      if (fotosSeleccionadas[slot]){
+        const id = `${docRef.id}_${slot}_${Date.now()}`;
+        await savePendingPhoto(id, fotosSeleccionadas[slot], { registroId: docRef.id, slot, coleccion: col("registros"), carpeta: carpetaFotos() });
+      }
+    }
+    syncPendingPhotos();
+
+    if (alertaUbicacion){
+      showToast(`Registro guardado, pero marcado para revisión: está a ${distanciaAlSitioM} m del sitio declarado.`, "error");
+    } else {
+      showToast(navigator.onLine ? "Registro guardado y sincronizando." : "Sin conexión: registro guardado en el equipo.", "success");
+    }
+
+    $("#form-captura").reset();
+    fotosSeleccionadas = { antes: null, durante: null, despues: null };
+    fotosMeta = { antes: null, durante: null, despues: null };
+    ["antes","durante","despues"].forEach(slot => {
+      const container = $(`#slot-${slot}`);
+      container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
+      attachPhotoInputListener(container.querySelector('input'));
+    });
+    capturaGPS = null;
+    $("#gps-readout").innerHTML = `<span class="muted">Sin capturar aún</span>`;
+    $("#gps-verificacion").innerHTML = "";
+    refreshSyncPill();
+  } catch(err){
+    console.error(err);
+    showToast("No se pudo guardar el registro: " + err.message, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Guardar registro";
+  }
+});
+
+/* =========================================================================
+   MIS REGISTROS (campo)
+   ========================================================================= */
+function cargarMisRegistros(){
+  const q = query(collection(db, col("registros")), orderBy("creadoEn", "desc"));
+  onSnapshot(q, (snap) => {
+    const propios = [];
+    snap.forEach(d => { const r = d.data(); if (r.capturadoPor === currentUser.uid) propios.push({id:d.id, ...r}); });
+    const tbody = $("#tbody-mis-registros");
+    tbody.innerHTML = propios.map(r => `
+      <tr>
+        <td>${formatFecha(r.timestampCaptura)}</td>
+        <td>${r.tipoMaquinaCodigo || r.tipoMaquina} · ${r.codigoMaquina}</td>
+        <td>${r.contratista}</td>
+        <td>${r.volumenM3}</td>
+        <td><span class="badge ${todasFotosListas(r) ? 'badge-ok':'badge-pending'}">${todasFotosListas(r) ? 'Sincronizado':'Enviando fotos'}</span></td>
+      </tr>`).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">Aún no has capturado registros.</td></tr>`;
+  });
+}
+function todasFotosListas(r){
+  return ["antes","durante","despues"].every(s => r.fotos[s].estado !== "pendiente");
+}
+function formatFecha(iso){
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-VE", { day:"2-digit", month:"short", year:"numeric" }) + " " + d.toLocaleTimeString("es-VE", { hour:"2-digit", minute:"2-digit" });
+}
+
+/* =========================================================================
+   PANEL ADMIN
+   ========================================================================= */
+function cargarPanelAdmin(){
+  const q = query(collection(db, col("registros")), orderBy("creadoEn", "desc"));
+  unsubRegistros = onSnapshot(q, (snap) => {
+    cacheRegistros = [];
+    snap.forEach(d => cacheRegistros.push({ id: d.id, ...d.data() }));
+    poblarFiltros();
+    renderTablaPanel();
+    renderStats();
+  });
+}
+function poblarFiltros(){
+  const contratistas = [...new Set(cacheRegistros.map(r => r.contratista).filter(Boolean))].sort();
+  const selC = $("#filtro-contratista"), selT = $("#filtro-tipo");
+  const curC = selC.value, curT = selT.value;
+  selC.innerHTML = `<option value="">Todos los contratistas</option>` + contratistas.map(c => `<option>${c}</option>`).join("");
+  selT.innerHTML = `<option value="">Todas las máquinas</option>` + CATALOGO_MAQUINARIA.map(m => `<option value="${m.codigo}">${m.codigo} — ${m.nombre}</option>`).join("");
+  selC.value = curC; selT.value = curT;
+}
+function registrosFiltrados(){
+  const texto = $("#filtro-texto").value.toLowerCase();
+  const contratista = $("#filtro-contratista").value;
+  const tipo = $("#filtro-tipo").value;
+  const alerta = $("#filtro-alerta").value;
+  return cacheRegistros.filter(r => {
+    if (contratista && r.contratista !== contratista) return false;
+    if (tipo && r.tipoMaquinaCodigo !== tipo) return false;
+    if (texto && !(`${r.codigoMaquina} ${r.contratista} ${r.operador}`.toLowerCase().includes(texto))) return false;
+    if (alerta === "alerta" && !(r.alertaUbicacion || r.alertaReloj)) return false;
+    if (alerta === "ubicacion" && !r.alertaUbicacion) return false;
+    if (alerta === "reloj" && !r.alertaReloj) return false;
+    return true;
+  });
+}
+function badgesVerificacion(r){
+  const badges = [];
+  if (r.alertaUbicacion) badges.push(`<span class="badge badge-alert">Fuera de zona${r.distanciaAlSitioM != null ? ` (${r.distanciaAlSitioM}m)` : ''}</span>`);
+  else if (r.sitioNombre) badges.push(`<span class="badge badge-ok">En sitio</span>`);
+  if (r.alertaReloj) badges.push(`<span class="badge badge-alert">Reloj ±${r.driftRelojMinutos}min</span>`);
+  return badges.join(" ") || `<span class="badge badge-ok">OK</span>`;
+}
+function renderTablaPanel(){
+  const datos = registrosFiltrados();
+  $("#tbody-panel").innerHTML = datos.map(r => `
+    <tr data-id="${r.id}">
+      <td>${formatFecha(r.timestampCaptura)}</td>
+      <td>${r.tipoMaquinaCodigo ? `<span style="font-family:var(--font-mono);font-size:11px;color:var(--accent-amber);">${r.tipoMaquinaCodigo}</span><br>` : ''}${r.tipoMaquina}<br><span style="color:var(--text-faint);font-family:var(--font-mono);font-size:11.5px;">Unidad ${r.codigoMaquina}</span></td>
+      <td>${r.contratista}</td>
+      <td>${r.operador}</td>
+      <td>${r.horasTrabajadas}</td>
+      <td>${r.combustibleLitros || "—"}</td>
+      <td>${r.volumenM3}</td>
+      <td><span class="badge ${todasFotosListas(r) ? 'badge-ok':'badge-pending'}">${contarFotos(r)}/3</span></td>
+      <td>${badgesVerificacion(r)}</td>
+      <td style="font-size:12px;color:var(--text-muted);">${r.capturadoPorNombre?.split(' · ')[0] || '—'}</td>
+    </tr>`).join("") || `<tr><td colspan="10" style="color:var(--text-faint);padding:16px;">No hay registros que coincidan con el filtro.</td></tr>`;
+  $all("#tbody-panel tr[data-id]").forEach(tr => tr.onclick = () => abrirDetalle(tr.dataset.id));
+}
+function contarFotos(r){ return ["antes","durante","despues"].filter(s => r.fotos[s].estado !== "sin_foto").length; }
+function renderStats(){
+  const datos = registrosFiltrados();
+  $("#stat-total").textContent = datos.length;
+  $("#stat-volumen").textContent = datos.reduce((a,r) => a + (r.volumenM3||0), 0).toFixed(1);
+  $("#stat-horas").textContent = datos.reduce((a,r) => a + (r.horasTrabajadas||0), 0).toFixed(1);
+  $("#stat-maquinas").textContent = new Set(datos.map(r => r.codigoMaquina)).size;
+  $("#stat-alertas").textContent = datos.filter(r => r.alertaUbicacion || r.alertaReloj).length;
+}
+["filtro-texto","filtro-contratista","filtro-tipo","filtro-alerta"].forEach(id => {
+  $(`#${id}`).addEventListener("input", () => { renderTablaPanel(); renderStats(); });
+});
+
+function abrirDetalle(id){
+  const r = cacheRegistros.find(x => x.id === id);
+  if (!r) return;
+  const mapsLink = r.ubicacion ? `https://www.google.com/maps?q=${r.ubicacion.lat},${r.ubicacion.lng}` : null;
+  const verifUbicacion = r.sitioNombre
+    ? (r.alertaUbicacion
+        ? `<span style="color:#FF9A85;">⚠ A ${r.distanciaAlSitioM} m de "${r.sitioNombre}" — fuera del radio permitido</span>`
+        : `<span style="color:var(--success);">✓ Dentro de "${r.sitioNombre}" (${r.distanciaAlSitioM} m del centro)</span>`)
+    : `<span class="muted">Sin sitio declarado</span>`;
+  const verifReloj = r.alertaReloj
+    ? `<span style="color:#FF9A85;">⚠ Hora del dispositivo difiere ${r.driftRelojMinutos} min de la hora del servidor</span>`
+    : `<span style="color:var(--success);">✓ Hora consistente con el servidor</span>`;
+  const root = $("#modal-root");
+  root.innerHTML = `
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <button class="modal-close" id="modal-close">✕</button>
+        <div class="section-title" style="margin-top:0;">${r.tipoMaquinaCodigo ? `${r.tipoMaquinaCodigo} — ` : ''}${r.tipoMaquina} · Unidad ${r.codigoMaquina}</div>
+        <div class="detail-grid">
+          <div><div class="k">Fecha</div>${formatFecha(r.timestampCaptura)}</div>
+          <div><div class="k">Contratista</div>${r.contratista}</div>
+          <div><div class="k">Operador</div>${r.operador}</div>
+          <div><div class="k">Horómetro</div>${r.horometro} h</div>
+          <div><div class="k">Horas trabajadas</div>${r.horasTrabajadas} h</div>
+          <div><div class="k">Combustible</div>${r.combustibleLitros || '—'} L</div>
+          <div><div class="k">Volumen removido</div>${r.volumenM3} m³</div>
+          <div><div class="k">Ubicación</div>${mapsLink ? `<a href="${mapsLink}" target="_blank">Ver en mapa</a>` : '—'}</div>
+          <div style="grid-column:1/-1;"><div class="k">Referencia</div>${r.referencia || '—'}</div>
+          <div style="grid-column:1/-1;"><div class="k">Notas</div>${r.notas || '—'}</div>
+        </div>
+        <div class="section-title">Verificación de campo</div>
+        <div class="detail-grid">
+          <div style="grid-column:1/-1;"><div class="k">Ubicación vs. sitio declarado</div>${verifUbicacion}</div>
+          <div style="grid-column:1/-1;"><div class="k">Reloj del dispositivo</div>${verifReloj}</div>
+        </div>
+        <div class="detail-photos">
+          ${["antes","durante","despues"].map(s => {
+            const f = r.fotos[s];
+            const coordTxt = f.ubicacion?.lat != null ? `${f.ubicacion.lat.toFixed(5)}, ${f.ubicacion.lng.toFixed(5)}` : "sin GPS";
+            return f.url
+              ? `<div><img src="${f.url}"><div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);margin-top:4px;">${coordTxt}</div></div>`
+              : `<div class="photo-slot"><span class="placeholder">${f.estado === 'pendiente' ? 'Sincronizando…' : 'Sin foto'}</span></div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+  $("#modal-close").onclick = () => root.innerHTML = "";
+  $("#modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") root.innerHTML = ""; };
+}
+
+/* Exportar CSV */
+$("#btn-export-csv").onclick = () => {
+  const datos = registrosFiltrados();
+  const headers = ["Fecha","CodigoTipo","Tipo","UnidadPlaca","Contratista","Operador","Horometro","HorasTrabajadas","CombustibleLitros","VolumenM3","Lat","Lng","SitioDeclarado","DistanciaAlSitioM","FueraDeZona","AlertaReloj","DriftRelojMinutos","Referencia","Notas","CapturadoPor"];
+  const filas = datos.map(r => [
+    formatFecha(r.timestampCaptura), r.tipoMaquinaCodigo || "", r.tipoMaquina, r.codigoMaquina, r.contratista, r.operador,
+    r.horometro, r.horasTrabajadas, r.combustibleLitros, r.volumenM3,
+    r.ubicacion?.lat || "", r.ubicacion?.lng || "",
+    r.sitioNombre || "", r.distanciaAlSitioM ?? "", r.alertaUbicacion ? "SI" : "NO",
+    r.alertaReloj ? "SI" : "NO", r.driftRelojMinutos ?? "",
+    (r.referencia||"").replace(/,/g," "), (r.notas||"").replace(/,/g," "),
+    r.capturadoPorNombre
+  ]);
+  const csv = [headers.join(","), ...filas.map(f => f.join(","))].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `registros_maquinaria_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+};
+
+/* =========================================================================
+   USUARIOS (admin) — aprobar solicitudes de rol admin
+   ========================================================================= */
+async function cargarUsuarios(){
+  const snap = await getDocs(collection(db, "usuarios"));
+  const tbody = $("#tbody-usuarios");
+  tbody.innerHTML = "";
+  const emailsRegistrados = new Set();
+  snap.forEach(d => {
+    const u = d.data();
+    emailsRegistrados.add(u.email);
+    const solicitudBadge = u.rolSolicitado === "admin" && u.role !== "admin" ? ` <span class="badge badge-pending">Solicita admin</span>` : "";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${u.nombre || "—"}</td>
+      <td>${u.email}</td>
+      <td>${u.role === "admin" ? "Administrador" : "Campo"}${solicitudBadge}</td>
+      <td></td>`;
+    const btn = document.createElement("button");
+    btn.className = "btn btn-ghost btn-sm";
+    btn.textContent = u.role === "admin" ? "Quitar rol admin" : "Hacer administrador";
+    btn.onclick = async () => {
+      await updateDoc(doc(db, "usuarios", d.id), { role: u.role === "admin" ? "campo" : "admin" });
+      cargarUsuarios();
+      showToast("Rol actualizado.", "success");
+    };
+    tr.lastElementChild.appendChild(btn);
+    tbody.appendChild(tr);
+  });
+  cargarPreautorizados(emailsRegistrados);
+}
+
+async function cargarPreautorizados(emailsRegistrados){
+  const snap = await getDocs(collection(db, "admins_autorizados"));
+  const tbody = $("#tbody-preautorizados");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  snap.forEach(d => {
+    const yaRegistrado = emailsRegistrados?.has(d.id);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${d.id}</td>
+      <td>${yaRegistrado ? `<span class="badge badge-ok">Ya registrado como admin</span>` : `<span class="badge badge-pending">Esperando registro</span>`}</td>
+      <td></td>`;
+    const btn = document.createElement("button");
+    btn.className = "btn btn-ghost btn-sm";
+    btn.textContent = "Quitar pre-autorización";
+    btn.onclick = async () => {
+      await deleteDoc(doc(db, "admins_autorizados", d.id));
+      cargarUsuarios();
+      showToast("Pre-autorización eliminada.", "success");
+    };
+    tr.lastElementChild.appendChild(btn);
+    tbody.appendChild(tr);
+  });
+  if (snap.empty){
+    tbody.innerHTML = `<tr><td colspan="3" style="color:var(--text-faint);padding:16px;">Ningún correo pre-autorizado por ahora.</td></tr>`;
+  }
+}
+
+$("#form-preautorizar").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#pa-email").value.trim();
+  try{
+    await setDoc(doc(db, "admins_autorizados", email), {
+      agregadoPor: currentUser.uid,
+      agregadoEn: serverTimestamp()
+    });
+    $("#form-preautorizar").reset();
+    cargarUsuarios();
+    showToast(`${email} podrá registrarse directamente como administrador.`, "success");
+  } catch(err){
+    showToast("No se pudo pre-autorizar: " + err.message, "error");
+  }
+});
+
+/* =========================================================================
+   SITIOS DE OBRA — geocercas para verificar ubicación de campo
+   ========================================================================= */
+async function cargarSitios(){
+  const snap = await getDocs(collection(db, col("sitios")));
+  cacheSitios = [];
+  snap.forEach(d => cacheSitios.push({ id: d.id, ...d.data() }));
+
+  const selectCampo = $("#f-sitio");
+  const valorActual = selectCampo.value;
+  selectCampo.innerHTML = `<option value="">Seleccionar sitio…</option>` +
+    cacheSitios.map(s => `<option value="${s.id}">${s.nombre}</option>`).join("");
+  selectCampo.value = valorActual;
+
+  if (currentRole === "admin") renderTablaSitios();
+}
+
+function renderTablaSitios(){
+  const tbody = $("#tbody-sitios");
+  if (!tbody) return;
+  tbody.innerHTML = cacheSitios.map(s => `
+    <tr>
+      <td>${s.nombre}</td>
+      <td style="font-family:var(--font-mono);font-size:12px;">${s.lat.toFixed(6)}, ${s.lng.toFixed(6)}</td>
+      <td>${s.radio} m</td>
+      <td><button class="btn btn-ghost btn-sm" data-del-sitio="${s.id}">Eliminar</button></td>
+    </tr>`).join("") || `<tr><td colspan="4" style="color:var(--text-faint);padding:16px;">Aún no hay sitios registrados.</td></tr>`;
+  $all("[data-del-sitio]").forEach(btn => btn.onclick = async () => {
+    if (!confirm("¿Eliminar este sitio? Los registros ya guardados no se verán afectados.")) return;
+    await deleteDoc(doc(db, col("sitios"), btn.dataset.delSitio));
+    cargarSitios();
+    showToast("Sitio eliminado.", "success");
+  });
+}
+
+$("#btn-sitio-gps").onclick = async () => {
+  const btn = $("#btn-sitio-gps");
+  btn.disabled = true; btn.textContent = "Obteniendo ubicación…";
+  try{
+    const gps = await obtenerGPSFresco();
+    $("#s-lat").value = gps.lat.toFixed(6);
+    $("#s-lng").value = gps.lng.toFixed(6);
+  } catch(err){
+    showToast("No se pudo obtener la ubicación: " + err.message, "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "Usar mi ubicación actual";
+  }
+};
+
+$("#form-sitio").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try{
+    await addDoc(collection(db, col("sitios")), {
+      nombre: $("#s-nombre").value.trim(),
+      lat: parseFloat($("#s-lat").value),
+      lng: parseFloat($("#s-lng").value),
+      radio: parseFloat($("#s-radio").value) || 250,
+      creadoPor: currentUser.uid,
+      creadoEn: serverTimestamp()
+    });
+    $("#form-sitio").reset();
+    $("#s-radio").value = 250;
+    cargarSitios();
+    showToast("Sitio agregado.", "success");
+  } catch(err){
+    showToast("No se pudo guardar el sitio: " + err.message, "error");
+  }
+});
+
+refreshSyncPill();
+</script>
+</body>
+</html>
