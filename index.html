@@ -13,8 +13,10 @@
 <meta name="theme-color" content="#1B1F24">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet (mapa) ya NO se carga aquí de entrada — se carga bajo demanda
+     solo cuando un admin abre el detalle de un registro. Esto evita que el
+     personal de campo cargue en memoria una librería que nunca va a usar,
+     justo cuando más importa mantener la memoria libre (tomando fotos). -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1013,7 +1015,7 @@ function compressImage(file, maxWidth = 1000, quality = 0.6){
 
 /* Comprime la foto y le quema encima fecha/hora + coordenadas + precisión GPS,
    como prueba visual de dónde y cuándo se tomó (estilo "geotag camera"). */
-async function compressAndWatermark(file, meta, maxWidth = 800, quality = 0.6){
+async function compressAndWatermark(file, meta, maxWidth = 640, quality = 0.55){
   const canvas = await decodificarReducido(file, maxWidth);
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
@@ -1040,6 +1042,8 @@ async function compressAndWatermark(file, meta, maxWidth = 800, quality = 0.6){
   return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality));
 }
 
+let ultimoErrorSincronizacionFotos = null;
+
 async function syncPendingPhotos(){
   if (!navigator.onLine || !hayRed) return;
   let pendientes;
@@ -1054,8 +1058,10 @@ async function syncPendingPhotos(){
       const regRef = db.collection(coleccion).doc(p.meta.registroId);
       await regRef.update({ [`fotos.${p.meta.slot}.url`]: url, [`fotos.${p.meta.slot}.estado`]: "sincronizado" });
       await deletePendingPhoto(p.id);
+      ultimoErrorSincronizacionFotos = null;
     } catch(err){
-      console.warn("No se pudo sincronizar foto pendiente, se reintentará:", err.message);
+      ultimoErrorSincronizacionFotos = err?.message || String(err);
+      console.warn("No se pudo sincronizar foto pendiente, se reintentará:", err);
     }
   }
   refreshSyncPill();
@@ -1186,8 +1192,10 @@ async function refreshSyncPill(){
     pill.className = "sync-pill offline";
     text.textContent = "Sin conexión — guardando localmente";
   } else if (pendientesFotos > 0){
-    pill.className = "sync-pill pending";
-    text.textContent = `Sincronizando (${pendientesFotos} foto${pendientesFotos>1?'s':''})…`;
+    pill.className = ultimoErrorSincronizacionFotos ? "sync-pill offline" : "sync-pill pending";
+    text.textContent = ultimoErrorSincronizacionFotos
+      ? `Error subiendo fotos: ${ultimoErrorSincronizacionFotos}`
+      : `Sincronizando (${pendientesFotos} foto${pendientesFotos>1?'s':''})…`;
   } else {
     pill.className = "sync-pill online";
     text.textContent = "En línea — sincronizado";
@@ -1853,9 +1861,38 @@ function cerrarMapaDetalle(){
   if (mapaDetalleActual){ mapaDetalleActual.remove(); mapaDetalleActual = null; }
 }
 
-function dibujarMapaDetalle(r){
+let leafletCargando = null;
+function cargarLeafletSiHaceFalta(){
+  if (window.L) return Promise.resolve();
+  if (leafletCargando) return leafletCargando;
+  leafletCargando = new Promise((resolve, reject) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    document.head.appendChild(link);
+
+    const script = document.createElement("script");
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("No se pudo cargar el mapa (sin conexión)"));
+    document.head.appendChild(script);
+  });
+  return leafletCargando;
+}
+
+async function dibujarMapaDetalle(r){
   const contenedor = document.getElementById("detalle-mapa");
-  if (!contenedor || !window.L) return;
+  if (!contenedor) return;
+
+  try{
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Cargando mapa…</div>`;
+    await cargarLeafletSiHaceFalta();
+  } catch(err){
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;text-align:center;padding:12px;">No se pudo cargar el mapa (necesita conexión la primera vez). Las coordenadas siguen guardadas en el registro.</div>`;
+    return;
+  }
+  contenedor.innerHTML = "";
+  if (!window.L) return;
 
   const sitio = r.sitioId ? cacheSitios.find(s => s.id === r.sitioId) : null;
   const puntos = [];
