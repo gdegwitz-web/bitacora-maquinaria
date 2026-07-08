@@ -15,6 +15,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Registrado aparte (no dentro del módulo principal): si el módulo falla
   // por falta de señal, esto igual se ejecuta y deja la app lista para
@@ -855,6 +859,11 @@
 /* =========================================================================
    CONFIGURACIÓN DE FIREBASE
    Proyecto: bitacora-maquinaria-47940
+   Usamos el SDK "compat" de Firebase (scripts clásicos cargados en el
+   <head>, no módulos ES) porque son archivos únicos y autocontenidos —
+   mucho más confiables de guardar para uso sin conexión con el service
+   worker, ya que el SDK modular descarga varios archivos internos "ocultos"
+   que son difíciles de garantizar en caché.
    ========================================================================= */
 const firebaseConfig = {
   apiKey: "AIzaSyDSBpgDQSHUUjJrAijcbMguA5vgAy2s9vg",
@@ -865,25 +874,12 @@ const firebaseConfig = {
   appId: "1:66030888970:web:cbdd32999b59d2c3c9d7f3"
 };
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  onAuthStateChanged, signOut
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, doc, setDoc, updateDoc, getDoc, getDocs, collection,
-  addDoc, deleteDoc, serverTimestamp, enableIndexedDbPersistence, onSnapshot, query, orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getStorage, ref, uploadBytes, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-try { await enableIndexedDbPersistence(db); } catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
+try { await db.enablePersistence(); } catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
 
 /* =========================================================================
    COLA LOCAL DE FOTOS (IndexedDB) — para cuando no hay señal
@@ -1011,11 +1007,11 @@ async function syncPendingPhotos(){
     try{
       const carpeta = p.meta.carpeta || carpetaFotos();
       const coleccion = p.meta.coleccion || col("registros");
-      const storageRef = ref(storage, `${carpeta}/${p.meta.registroId}/${p.meta.slot}_${p.id}.jpg`);
-      await uploadBytes(storageRef, p.blob);
-      const url = await getDownloadURL(storageRef);
-      const regRef = doc(db, coleccion, p.meta.registroId);
-      await updateDoc(regRef, { [`fotos.${p.meta.slot}.url`]: url, [`fotos.${p.meta.slot}.estado`]: "sincronizado" });
+      const storageRef = storage.ref(`${carpeta}/${p.meta.registroId}/${p.meta.slot}_${p.id}.jpg`);
+      await storageRef.put(p.blob);
+      const url = await storageRef.getDownloadURL();
+      const regRef = db.collection(coleccion).doc(p.meta.registroId);
+      await regRef.update({ [`fotos.${p.meta.slot}.url`]: url, [`fotos.${p.meta.slot}.estado`]: "sincronizado" });
       await deletePendingPhoto(p.id);
     } catch(err){
       console.warn("No se pudo sincronizar foto pendiente, se reintentará:", err.message);
@@ -1177,22 +1173,22 @@ $("#form-login").addEventListener("submit", async (e) => {
     if (modoSignup){
       const nombre = $("#signup-name").value.trim() || email;
       const rolSolicitado = document.querySelector('input[name="signup-role"]:checked').value;
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
 
       // Si el correo fue pre-autorizado por un admin existente (pestaña "Usuarios"),
       // la cuenta nace directamente como administrador. Si no, nace como "campo" y,
       // si pidió ser admin, queda marcada para aprobación manual.
       let esPreautorizado = false;
       try{
-        const preauth = await getDoc(doc(db, "admins_autorizados", cred.user.email));
-        esPreautorizado = preauth.exists();
+        const preauth = await db.collection("admins_autorizados").doc(cred.user.email).get();
+        esPreautorizado = preauth.exists;
       } catch(err){ /* sin permisos de lectura o sin conexión: se crea como campo */ }
 
-      await setDoc(doc(db, "usuarios", cred.user.uid), {
+      await db.collection("usuarios").doc(cred.user.uid).set({
         nombre, email: cred.user.email,
         role: esPreautorizado ? "admin" : "campo",
         rolSolicitado: (!esPreautorizado && rolSolicitado === "admin_solicitado") ? "admin" : null,
-        creadoEn: serverTimestamp()
+        creadoEn: firebase.firestore.FieldValue.serverTimestamp()
       });
 
       if (esPreautorizado){
@@ -1201,7 +1197,7 @@ $("#form-login").addEventListener("submit", async (e) => {
         showToast("Cuenta creada. Tu solicitud de administrador quedó pendiente de aprobación.", "success");
       }
     } else {
-      await signInWithEmailAndPassword(auth, email, password);
+      await auth.signInWithEmailAndPassword(email, password);
     }
   } catch(err){
     $("#login-error").textContent = traducirErrorAuth(err.code);
@@ -1234,7 +1230,7 @@ $("#btn-welcome-continue").onclick = () => {
 };
 $("#btn-login-back").onclick = () => mostrarPantallaAuth("welcome");
 
-$("#btn-logout").onclick = () => signOut(auth);
+$("#btn-logout").onclick = () => auth.signOut();
 
 $("#btn-modo-prueba").onclick = () => {
   const activando = !modoPrueba;
@@ -1246,12 +1242,12 @@ $("#btn-modo-prueba").onclick = () => {
   location.reload();
 };
 
-onAuthStateChanged(auth, async (user) => {
+auth.onAuthStateChanged(async (user) => {
   window.__bitacoraListo = true;
   if (user){
     currentUser = user;
-    const userDoc = await getDoc(doc(db, "usuarios", user.uid));
-    currentRole = userDoc.exists() ? userDoc.data().role : "campo";
+    const userDoc = await db.collection("usuarios").doc(user.uid).get();
+    currentRole = userDoc.exists ? userDoc.data().role : "campo";
     mostrarPantallaAuth(null);
     $("#app").classList.add("active");
     $("#user-chip").textContent = `${userDoc.data()?.nombre || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
@@ -1420,22 +1416,22 @@ $("#form-captura").addEventListener("submit", async (e) => {
     capturadoPor: currentUser.uid,
     capturadoPorNombre: $("#user-chip").textContent,
     timestampCaptura: timestampCapturaLocal,
-    creadoEn: serverTimestamp()
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp()
   };
 
   try{
-    const docRef = await addDoc(collection(db, col("registros")), registro);
+    const docRef = await db.collection(col("registros")).add(registro);
 
     // Verificación de reloj: comparamos la hora que el dispositivo dice que es
     // contra la hora real que Firebase asignó al guardar (serverTimestamp).
     try{
-      const snap = await getDoc(docRef);
+      const snap = await docRef.get();
       const horaServidor = snap.data().creadoEn?.toDate?.();
       if (horaServidor){
         const driftMs = Math.abs(horaServidor.getTime() - new Date(timestampCapturaLocal).getTime());
         const driftMin = Math.round(driftMs / 60000);
         if (driftMin > UMBRAL_RELOJ_MINUTOS){
-          await updateDoc(docRef, { alertaReloj: true, driftRelojMinutos: driftMin });
+          await docRef.update({ alertaReloj: true, driftRelojMinutos: driftMin });
         }
       }
     } catch(err){ console.warn("No se pudo verificar el reloj del servidor:", err.message); }
@@ -1480,8 +1476,8 @@ $("#form-captura").addEventListener("submit", async (e) => {
    MIS REGISTROS (campo)
    ========================================================================= */
 function cargarMisRegistros(){
-  const q = query(collection(db, col("registros")), orderBy("creadoEn", "desc"));
-  onSnapshot(q, (snap) => {
+  const q = db.collection(col("registros")).orderBy("creadoEn", "desc");
+  q.onSnapshot((snap) => {
     const propios = [];
     snap.forEach(d => { const r = d.data(); if (r.capturadoPor === currentUser.uid) propios.push({id:d.id, ...r}); });
     const tbody = $("#tbody-mis-registros");
@@ -1508,8 +1504,8 @@ function formatFecha(iso){
    PANEL ADMIN
    ========================================================================= */
 function cargarPanelAdmin(){
-  const q = query(collection(db, col("registros")), orderBy("creadoEn", "desc"));
-  unsubRegistros = onSnapshot(q, (snap) => {
+  const q = db.collection(col("registros")).orderBy("creadoEn", "desc");
+  unsubRegistros = q.onSnapshot((snap) => {
     cacheRegistros = [];
     snap.forEach(d => cacheRegistros.push({ id: d.id, ...d.data() }));
     poblarFiltros();
@@ -1859,7 +1855,7 @@ $("#btn-export-csv").onclick = () => {
    USUARIOS (admin) — aprobar solicitudes de rol admin
    ========================================================================= */
 async function cargarUsuarios(){
-  const snap = await getDocs(collection(db, "usuarios"));
+  const snap = await db.collection("usuarios").get();
   const tbody = $("#tbody-usuarios");
   tbody.innerHTML = "";
   const emailsRegistrados = new Set();
@@ -1877,7 +1873,7 @@ async function cargarUsuarios(){
     btn.className = "btn btn-ghost btn-sm";
     btn.textContent = u.role === "admin" ? "Quitar rol admin" : "Hacer administrador";
     btn.onclick = async () => {
-      await updateDoc(doc(db, "usuarios", d.id), { role: u.role === "admin" ? "campo" : "admin" });
+      await db.collection("usuarios").doc(d.id).update({ role: u.role === "admin" ? "campo" : "admin" });
       cargarUsuarios();
       showToast("Rol actualizado.", "success");
     };
@@ -1888,7 +1884,7 @@ async function cargarUsuarios(){
 }
 
 async function cargarPreautorizados(emailsRegistrados){
-  const snap = await getDocs(collection(db, "admins_autorizados"));
+  const snap = await db.collection("admins_autorizados").get();
   const tbody = $("#tbody-preautorizados");
   if (!tbody) return;
   tbody.innerHTML = "";
@@ -1903,7 +1899,7 @@ async function cargarPreautorizados(emailsRegistrados){
     btn.className = "btn btn-ghost btn-sm";
     btn.textContent = "Quitar pre-autorización";
     btn.onclick = async () => {
-      await deleteDoc(doc(db, "admins_autorizados", d.id));
+      await db.collection("admins_autorizados").doc(d.id).delete();
       cargarUsuarios();
       showToast("Pre-autorización eliminada.", "success");
     };
@@ -1919,9 +1915,9 @@ $("#form-preautorizar").addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = $("#pa-email").value.trim();
   try{
-    await setDoc(doc(db, "admins_autorizados", email), {
+    await db.collection("admins_autorizados").doc(email).set({
       agregadoPor: currentUser.uid,
-      agregadoEn: serverTimestamp()
+      agregadoEn: firebase.firestore.FieldValue.serverTimestamp()
     });
     $("#form-preautorizar").reset();
     cargarUsuarios();
@@ -1935,7 +1931,7 @@ $("#form-preautorizar").addEventListener("submit", async (e) => {
    SITIOS DE OBRA — geocercas para verificar ubicación de campo
    ========================================================================= */
 async function cargarSitios(){
-  const snap = await getDocs(collection(db, col("sitios")));
+  const snap = await db.collection(col("sitios")).get();
   cacheSitios = [];
   snap.forEach(d => cacheSitios.push({ id: d.id, ...d.data() }));
 
@@ -1960,7 +1956,7 @@ function renderTablaSitios(){
     </tr>`).join("") || `<tr><td colspan="4" style="color:var(--text-faint);padding:16px;">Aún no hay sitios registrados.</td></tr>`;
   $all("[data-del-sitio]").forEach(btn => btn.onclick = async () => {
     if (!confirm("¿Eliminar este sitio? Los registros ya guardados no se verán afectados.")) return;
-    await deleteDoc(doc(db, col("sitios"), btn.dataset.delSitio));
+    await db.collection(col("sitios")).doc(btn.dataset.delSitio).delete();
     cargarSitios();
     showToast("Sitio eliminado.", "success");
   });
@@ -1983,13 +1979,13 @@ $("#btn-sitio-gps").onclick = async () => {
 $("#form-sitio").addEventListener("submit", async (e) => {
   e.preventDefault();
   try{
-    await addDoc(collection(db, col("sitios")), {
+    await db.collection(col("sitios")).add({
       nombre: $("#s-nombre").value.trim(),
       lat: parseFloat($("#s-lat").value),
       lng: parseFloat($("#s-lng").value),
       radio: parseFloat($("#s-radio").value) || 250,
       creadoPor: currentUser.uid,
-      creadoEn: serverTimestamp()
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
     });
     $("#form-sitio").reset();
     $("#s-radio").value = 250;

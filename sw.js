@@ -11,11 +11,12 @@
    conexión al menos una vez para poder guardar la copia actualizada.
    ========================================================================= */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `bitacora-maquinaria-${CACHE_VERSION}`;
 
-// Archivos propios de la app + las URLs exactas del SDK de Firebase que usa
-// index.html (fijas por versión, así que se pueden guardar de antemano).
+// Archivos propios de la app + las URLs exactas del SDK "compat" de Firebase
+// (archivos únicos y autocontenidos, sin dependencias internas ocultas —
+// por eso se puede confiar en que quedan completos con solo listarlos aquí).
 const PRECACHE_URLS = [
   "./",
   "./index.html",
@@ -24,10 +25,10 @@ const PRECACHE_URLS = [
   "./icon-512.png",
   "./icon-180.png",
   "./favicon-32.png",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
-  "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js"
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js",
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js",
+  "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"
 ];
 
 self.addEventListener("install", (event) => {
