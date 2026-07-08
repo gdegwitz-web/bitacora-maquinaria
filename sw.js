@@ -11,7 +11,7 @@
    conexión al menos una vez para poder guardar la copia actualizada.
    ========================================================================= */
 
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `bitacora-maquinaria-${CACHE_VERSION}`;
 
 // Archivos propios de la app + las URLs exactas del SDK "compat" de Firebase
@@ -58,6 +58,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
+
+  // La verificación rápida de conectividad ("¿hay señal de verdad?") no debe
+  // pasar por esta lógica de caché — necesita hablar con la red directo, sin
+  // intermediarios, para poder fallar rápido y de forma confiable cuando no
+  // hay señal. Si no llamamos a respondWith(), el navegador la deja pasar tal
+  // cual, como si este service worker no existiera para esa petición puntual.
+  if (req.url.includes("generate_204")) return;
 
   // Al ABRIR la app (navegación): intenta red primero (así siempre se ve la
   // versión más reciente si hay señal), y si falla, usa la copia guardada.

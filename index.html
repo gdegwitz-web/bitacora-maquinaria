@@ -888,17 +888,24 @@ try { await db.enablePersistence(); } catch(e) { console.warn("Persistencia offl
    verificación rápida (2.5s), ANTES de leer nada, forzamos el modo offline de
    inmediato si no hay conexión real, y lo reactivamos apenas vuelva la señal. */
 async function hayConexionReal(timeoutMs = 2500){
-  try{
-    const controlador = new AbortController();
-    const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
-    await fetch(`https://www.gstatic.com/generate_204?_=${Date.now()}`, {
-      mode: "no-cors", cache: "no-store", signal: controlador.signal
-    });
-    clearTimeout(temporizador);
-    return true;
-  } catch(err){
-    return false;
-  }
+  const intento = (async () => {
+    try{
+      const controlador = new AbortController();
+      const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
+      await fetch(`https://www.gstatic.com/generate_204?_=${Date.now()}`, {
+        mode: "no-cors", cache: "no-store", signal: controlador.signal
+      });
+      clearTimeout(temporizador);
+      return true;
+    } catch(err){
+      return false;
+    }
+  })();
+  // Límite de tiempo absoluto: pase lo que pase con el fetch de arriba
+  // (incluso si algo raro hace que ni siquiera el abort funcione bien), esta
+  // función NUNCA debe dejar a la app esperando más de este tiempo.
+  const limiteAbsoluto = new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs + 1500));
+  return Promise.race([intento, limiteAbsoluto]);
 }
 
 const conexionInicialReal = await hayConexionReal();
