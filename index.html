@@ -15,6 +15,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Registrado aparte (no dentro del módulo principal): si el módulo falla
+  // por falta de señal, esto igual se ejecuta y deja la app lista para
+  // funcionar sin conexión la próxima vez.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => {
+        console.warn("No se pudo registrar el service worker:", err);
+      });
+    });
+  }
+</script>
 <style>
   :root{
     --bg-base:#1B1F24;
