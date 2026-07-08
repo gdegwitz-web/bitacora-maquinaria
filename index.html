@@ -908,10 +908,19 @@ async function hayConexionReal(timeoutMs = 2500){
   return Promise.race([intento, limiteAbsoluto]);
 }
 
-const conexionInicialReal = await hayConexionReal();
-if (!conexionInicialReal) { try { await db.disableNetwork(); } catch(e){} }
-window.addEventListener("online", () => { hayConexionReal().then((online) => { if (online) db.enableNetwork().catch(() => {}); }); });
-window.addEventListener("offline", () => { db.disableNetwork().catch(() => {}); });
+let hayRed = await hayConexionReal();
+if (!hayRed) { try { await db.disableNetwork(); } catch(e){} }
+
+/* Envuelve cualquier lectura de Firestore con un límite de tiempo absoluto.
+   Si no responde a tiempo (por ejemplo, porque el dispositivo cree que hay
+   señal pero en realidad no la hay), seguimos con "valorPorDefecto" en vez
+   de quedarnos esperando para siempre. */
+function conTimeout(promesa, ms, valorPorDefecto){
+  return Promise.race([
+    promesa,
+    new Promise((resolve) => setTimeout(() => resolve(valorPorDefecto), ms))
+  ]);
+}
 
 /* =========================================================================
    COLA LOCAL DE FOTOS (IndexedDB) — para cuando no hay señal
@@ -1032,7 +1041,7 @@ async function compressAndWatermark(file, meta, maxWidth = 800, quality = 0.6){
 }
 
 async function syncPendingPhotos(){
-  if (!navigator.onLine) return;
+  if (!navigator.onLine || !hayRed) return;
   let pendientes;
   try { pendientes = await getAllPendingPhotos(); } catch(e){ return; }
   for (const p of pendientes){
@@ -1173,7 +1182,7 @@ async function refreshSyncPill(){
   const text = $("#sync-text");
   let pendientesFotos = 0;
   try { pendientesFotos = (await getAllPendingPhotos()).length; } catch(e){}
-  if (!navigator.onLine){
+  if (!navigator.onLine || !hayRed){
     pill.className = "sync-pill offline";
     text.textContent = "Sin conexión — guardando localmente";
   } else if (pendientesFotos > 0){
@@ -1184,9 +1193,15 @@ async function refreshSyncPill(){
     text.textContent = "En línea — sincronizado";
   }
 }
-window.addEventListener("online", () => { refreshSyncPill(); syncPendingPhotos(); });
-window.addEventListener("offline", refreshSyncPill);
-setInterval(() => { refreshSyncPill(); syncPendingPhotos(); }, 20000);
+window.addEventListener("online", () => { hayConexionReal().then(online => { hayRed = online; if (online) db.enableNetwork().catch(() => {}); refreshSyncPill(); syncPendingPhotos(); }); });
+window.addEventListener("offline", () => { hayRed = false; db.disableNetwork().catch(() => {}); refreshSyncPill(); });
+// Revisamos la conexión real de forma activa cada 20s, sin depender solo de
+// los eventos online/offline del navegador (que a veces no son confiables).
+setInterval(async () => {
+  hayRed = await hayConexionReal();
+  refreshSyncPill();
+  syncPendingPhotos();
+}, 20000);
 
 /* =========================================================================
    AUTENTICACIÓN
@@ -1457,35 +1472,44 @@ $("#form-captura").addEventListener("submit", async (e) => {
   };
 
   try{
-    const docRef = await db.collection(col("registros")).add(registro);
+    // Generamos el ID del registro de forma local (sin red, es instantáneo)
+    // y encolamos las fotos de inmediato con ese ID. El guardado real en
+    // Firestore se dispara sin esperarlo — con persistencia offline igual
+    // queda aplicado al caché local casi al instante, pero así el botón
+    // "Guardando…" nunca depende de que el servidor confirme nada.
+    const nuevoDocRef = db.collection(col("registros")).doc();
+    const idRegistro = nuevoDocRef.id;
 
-    // Verificación de reloj: comparamos la hora que el dispositivo dice que es
-    // contra la hora real que Firebase asignó al guardar (serverTimestamp).
-    try{
-      const snap = await docRef.get();
-      const horaServidor = snap.data().creadoEn?.toDate?.();
-      if (horaServidor){
-        const driftMs = Math.abs(horaServidor.getTime() - new Date(timestampCapturaLocal).getTime());
-        const driftMin = Math.round(driftMs / 60000);
-        if (driftMin > UMBRAL_RELOJ_MINUTOS){
-          await docRef.update({ alertaReloj: true, driftRelojMinutos: driftMin });
-        }
-      }
-    } catch(err){ console.warn("No se pudo verificar el reloj del servidor:", err.message); }
-
-    // encolar fotos localmente y disparar sincronización
     for (const slot of ["antes","despues"]){
       if (fotosSeleccionadas[slot]){
-        const id = `${docRef.id}_${slot}_${Date.now()}`;
-        await savePendingPhoto(id, fotosSeleccionadas[slot], { registroId: docRef.id, slot, coleccion: col("registros"), carpeta: carpetaFotos() });
+        const idFoto = `${idRegistro}_${slot}_${Date.now()}`;
+        await savePendingPhoto(idFoto, fotosSeleccionadas[slot], { registroId: idRegistro, slot, coleccion: col("registros"), carpeta: carpetaFotos() });
       }
     }
+
+    nuevoDocRef.set(registro).then(() => {
+      // Verificación de reloj, solo si hay conexión real — y sin bloquear
+      // nada: si falla o tarda, no afecta al usuario en absoluto.
+      if (hayRed){
+        conTimeout(nuevoDocRef.get(), 5000, null).then((snap) => {
+          const horaServidor = snap?.data()?.creadoEn?.toDate?.();
+          if (horaServidor){
+            const driftMs = Math.abs(horaServidor.getTime() - new Date(timestampCapturaLocal).getTime());
+            const driftMin = Math.round(driftMs / 60000);
+            if (driftMin > UMBRAL_RELOJ_MINUTOS){
+              nuevoDocRef.update({ alertaReloj: true, driftRelojMinutos: driftMin }).catch(() => {});
+            }
+          }
+        }).catch((err) => console.warn("No se pudo verificar el reloj del servidor:", err.message));
+      }
+    }).catch((err) => console.warn("El registro quedó guardado localmente; se reintentará sincronizar:", err.message));
+
     syncPendingPhotos();
 
     if (alertaUbicacion){
       showToast(`Registro guardado, pero marcado para revisión: está a ${distanciaAlSitioM} m del sitio declarado.`, "error");
     } else {
-      showToast(navigator.onLine ? "Registro guardado y sincronizando." : "Sin conexión: registro guardado en el equipo.", "success");
+      showToast(hayRed ? "Registro guardado y sincronizando." : "Sin conexión: registro guardado en el equipo.", "success");
     }
 
     $("#form-captura").reset();
