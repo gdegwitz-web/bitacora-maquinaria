@@ -314,7 +314,6 @@
   .photo-slot img{width:100%;height:100%;object-fit:cover;}
   .photo-slot .placeholder{text-align:center;color:var(--text-faint);font-size:12px;padding:8px;}
   .photo-slot .placeholder .icon{font-size:22px;display:block;margin-bottom:6px;}
-  .photo-slot input{position:absolute;inset:0;opacity:0;cursor:pointer;}
   .photo-slot .tag{
     position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-family:var(--font-mono);
     font-size:10px;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.05em;
@@ -323,6 +322,25 @@
     position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:#fff;border-radius:3px;
     width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:13px;z-index:2;
   }
+
+  /* ---------- Cámara en pantalla ---------- */
+  #camara-overlay{
+    position:fixed;inset:0;z-index:300;background:#000;display:flex;flex-direction:column;
+  }
+  #camara-video,#camara-preview-img{flex:1;width:100%;min-height:0;object-fit:cover;background:#000;}
+  #camara-error{
+    flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);
+    padding:28px;text-align:center;font-size:14px;line-height:1.5;
+  }
+  .camara-controles{
+    padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;
+    background:#0B0D0F;padding-bottom:calc(18px + env(safe-area-inset-bottom));
+  }
+  #btn-camara-disparar{
+    width:66px;height:66px;border-radius:50%;background:var(--accent-amber);
+    border:4px solid #fff;cursor:pointer;flex-shrink:0;
+  }
+  #btn-camara-disparar:active{transform:scale(.94);}
 
   /* ---------- Records table ---------- */
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
@@ -657,16 +675,16 @@
 
             <div class="section-title">Evidencia fotográfica</div>
             <div class="photo-grid">
-              <label class="photo-slot" id="slot-antes">
+              <div class="photo-slot" id="slot-antes" data-slot="antes">
                 <span class="tag">Antes</span>
                 <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
-                <input type="file" accept="image/*" capture="environment" data-slot="antes">
-              </label>
-              <label class="photo-slot" id="slot-despues">
+                <input type="file" accept="image/*" capture="environment" data-slot="antes" class="hidden">
+              </div>
+              <div class="photo-slot" id="slot-despues" data-slot="despues">
                 <span class="tag">Después</span>
                 <span class="placeholder"><span class="icon">📷</span>Tomar foto</span>
-                <input type="file" accept="image/*" capture="environment" data-slot="despues">
-              </label>
+                <input type="file" accept="image/*" capture="environment" data-slot="despues" class="hidden">
+              </div>
             </div>
 
             <div class="section-title">Estado de la máquina</div>
@@ -856,6 +874,24 @@
 </div>
 
 <div id="modal-root"></div>
+
+<!-- ============ CÁMARA EN PANTALLA ============
+     Evita salir de la app hacia la app nativa de Cámara de Android, que es
+     lo que causaba que el sistema cerrara la pestaña por falta de memoria. -->
+<div id="camara-overlay" class="hidden">
+  <video id="camara-video" autoplay playsinline muted></video>
+  <img id="camara-preview-img" class="hidden">
+  <div id="camara-error" class="hidden"></div>
+  <div id="camara-controles-video" class="camara-controles">
+    <button type="button" id="btn-camara-cancelar" class="btn btn-ghost btn-sm">Cancelar</button>
+    <button type="button" id="btn-camara-disparar" aria-label="Tomar foto"></button>
+    <span style="width:78px;"></span>
+  </div>
+  <div id="camara-controles-preview" class="camara-controles hidden">
+    <button type="button" id="btn-camara-repetir" class="btn btn-ghost btn-block">↺ Repetir</button>
+    <button type="button" id="btn-camara-usar" class="btn btn-primary btn-block">✓ Usar esta foto</button>
+  </div>
+</div>
 
 <script type="module">
 /* =========================================================================
@@ -1373,36 +1409,132 @@ $("#f-sitio").addEventListener("change", verificarContraSitio);
    ========================================================================= */
 let previewURLs = { antes: null, despues: null };
 
+function marcarSlotVacio(slot){
+  const container = $(`#slot-${slot}`);
+  container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}" class="hidden">`;
+  attachPhotoInputListener(container.querySelector('input'));
+}
+
+/* Procesa una foto (venga de la cámara en pantalla o del selector de
+   archivos de respaldo) y la deja lista en el slot correspondiente. */
+async function procesarFotoParaSlot(slot, file){
+  const container = $(`#slot-${slot}`);
+  container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder">Ubicando y sellando foto…</span>`;
+
+  let gps = null;
+  try { gps = await obtenerGPSFresco(8000); } catch(err){ /* seguimos sin GPS, se marcará como sin ubicación */ }
+  const timestamp = new Date().toISOString();
+  const meta = { lat: gps?.lat ?? null, lng: gps?.lng ?? null, precision: gps?.precision ?? null, timestamp, etiqueta: slot.toUpperCase() };
+  fotosMeta[slot] = meta;
+
+  try{
+    const compressed = await compressAndWatermark(file, meta);
+    fotosSeleccionadas[slot] = compressed;
+    if (previewURLs[slot]) URL.revokeObjectURL(previewURLs[slot]);
+    const url = URL.createObjectURL(compressed);
+    previewURLs[slot] = url;
+    container.innerHTML = `<span class="tag">${slot}</span><img src="${url}"><span class="clear-btn" data-clear="${slot}">✕</span>`;
+  } catch(err){
+    console.error("Error procesando foto:", err);
+    showToast(`No se pudo procesar la foto de "${slot}". Intenta de nuevo.`, "error");
+    marcarSlotVacio(slot);
+  }
+}
+
 function attachPhotoInputListener(input){
   input.addEventListener("change", async (e) => {
     const slot = input.dataset.slot;
     const file = e.target.files[0];
     if (!file) return;
-    const container = $(`#slot-${slot}`);
-    container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder">Ubicando y sellando foto…</span>`;
-
-    let gps = null;
-    try { gps = await obtenerGPSFresco(8000); } catch(err){ /* seguimos sin GPS, se marcará como sin ubicación */ }
-    const timestamp = new Date().toISOString();
-    const meta = { lat: gps?.lat ?? null, lng: gps?.lng ?? null, precision: gps?.precision ?? null, timestamp, etiqueta: slot.toUpperCase() };
-    fotosMeta[slot] = meta;
-
-    try{
-      const compressed = await compressAndWatermark(file, meta);
-      fotosSeleccionadas[slot] = compressed;
-      if (previewURLs[slot]) URL.revokeObjectURL(previewURLs[slot]);
-      const url = URL.createObjectURL(compressed);
-      previewURLs[slot] = url;
-      container.innerHTML = `<span class="tag">${slot}</span><img src="${url}"><span class="clear-btn" data-clear="${slot}">✕</span>`;
-    } catch(err){
-      console.error("Error procesando foto:", err);
-      showToast(`No se pudo procesar la foto de "${slot}". Intenta de nuevo (a veces ayuda tomarla con menos zoom o resolución).`, "error");
-      container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
-      attachPhotoInputListener(container.querySelector('input'));
-    }
+    procesarFotoParaSlot(slot, file);
   });
 }
 $all('input[type=file][data-slot]').forEach(attachPhotoInputListener);
+
+/* =========================================================================
+   CÁMARA EN PANTALLA
+   Usa la cámara del celular directamente dentro de la app (getUserMedia),
+   en vez de abrir la app nativa de Cámara de Android. Esto evita que el
+   sistema operativo pause o cierre la pestaña de Chrome por falta de
+   memoria mientras la app de cámara está en primer plano — que era la causa
+   de que la app "se saliera" al tomar una foto.
+   ========================================================================= */
+let camaraSlotActual = null;
+let camaraStreamActual = null;
+let camaraBlobCapturado = null;
+
+function iniciarCapturaFoto(slot){
+  if (!navigator.mediaDevices?.getUserMedia){
+    // Navegador sin soporte: usamos el selector de archivos de respaldo.
+    $(`#slot-${slot} input[type=file]`)?.click();
+    return;
+  }
+  camaraSlotActual = slot;
+  camaraBlobCapturado = null;
+  $("#camara-overlay").classList.remove("hidden");
+  $("#camara-error").classList.add("hidden");
+  $("#camara-video").classList.remove("hidden");
+  $("#camara-preview-img").classList.add("hidden");
+  $("#camara-controles-video").classList.remove("hidden");
+  $("#camara-controles-preview").classList.add("hidden");
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 960 } },
+    audio: false
+  }).then((stream) => {
+    camaraStreamActual = stream;
+    $("#camara-video").srcObject = stream;
+  }).catch((err) => {
+    $("#camara-video").classList.add("hidden");
+    $("#camara-controles-video").classList.add("hidden");
+    $("#camara-error").classList.remove("hidden");
+    $("#camara-error").innerHTML = `No se pudo acceder a la cámara (${err.message}).<br><br><button type="button" class="btn btn-primary btn-sm" id="btn-camara-usar-archivo">Seleccionar foto de otra forma</button>`;
+    $("#btn-camara-usar-archivo").onclick = () => { cerrarCamara(); $(`#slot-${slot} input[type=file]`)?.click(); };
+  });
+}
+
+function detenerStreamCamara(){
+  if (camaraStreamActual){
+    camaraStreamActual.getTracks().forEach(t => t.stop());
+    camaraStreamActual = null;
+  }
+}
+
+function cerrarCamara(){
+  detenerStreamCamara();
+  $("#camara-overlay").classList.add("hidden");
+  camaraSlotActual = null;
+}
+
+function dispararCaptura(){
+  const video = $("#camara-video");
+  if (!video.videoWidth) return;
+  const targetW = Math.min(900, video.videoWidth);
+  const scale = targetW / video.videoWidth;
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob((blob) => {
+    camaraBlobCapturado = blob;
+    detenerStreamCamara(); // liberamos la cámara apenas tenemos la foto
+    $("#camara-preview-img").src = URL.createObjectURL(blob);
+    $("#camara-video").classList.add("hidden");
+    $("#camara-preview-img").classList.remove("hidden");
+    $("#camara-controles-video").classList.add("hidden");
+    $("#camara-controles-preview").classList.remove("hidden");
+  }, "image/jpeg", 0.8);
+}
+
+$("#btn-camara-cancelar").onclick = () => cerrarCamara();
+$("#btn-camara-disparar").onclick = () => dispararCaptura();
+$("#btn-camara-repetir").onclick = () => iniciarCapturaFoto(camaraSlotActual);
+$("#btn-camara-usar").onclick = () => {
+  const slot = camaraSlotActual;
+  const blob = camaraBlobCapturado;
+  cerrarCamara();
+  if (slot && blob) procesarFotoParaSlot(slot, blob);
+};
 
 document.addEventListener("click", (e) => {
   if (e.target.dataset && e.target.dataset.clear){
@@ -1411,11 +1543,14 @@ document.addEventListener("click", (e) => {
     fotosMeta[slot] = null;
     if (previewURLs[slot]) { URL.revokeObjectURL(previewURLs[slot]); previewURLs[slot] = null; }
     e.stopPropagation(); e.preventDefault();
-    const container = $(`#slot-${slot}`);
-    container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
-    attachPhotoInputListener(container.querySelector('input'));
+    marcarSlotVacio(slot);
+    return;
   }
-}, true);
+  const slotEl = e.target.closest(".photo-slot");
+  if (slotEl && slotEl.dataset.slot){
+    iniciarCapturaFoto(slotEl.dataset.slot);
+  }
+});
 
 /* =========================================================================
    GUARDAR REGISTRO
@@ -1526,9 +1661,7 @@ $("#form-captura").addEventListener("submit", async (e) => {
     fotosMeta = { antes: null, despues: null };
     ["antes","despues"].forEach(slot => {
       if (previewURLs[slot]) { URL.revokeObjectURL(previewURLs[slot]); previewURLs[slot] = null; }
-      const container = $(`#slot-${slot}`);
-      container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
-      attachPhotoInputListener(container.querySelector('input'));
+      marcarSlotVacio(slot);
     });
     capturaGPS = null;
     $("#gps-readout").innerHTML = `<span class="muted">Sin capturar aún</span>`;
