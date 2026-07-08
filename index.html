@@ -881,6 +881,31 @@ const storage = firebase.storage();
 
 try { await db.enablePersistence(); } catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
 
+/* navigator.onLine no siempre es confiable (en Android, en modo avión a
+   veces sigue reportando "en línea"). Si Firestore cree que hay red, intenta
+   establecer una conexión en vivo antes de rendirse y usar los datos
+   guardados localmente — eso es lo que puede tardar ~30 segundos. Con esta
+   verificación rápida (2.5s), ANTES de leer nada, forzamos el modo offline de
+   inmediato si no hay conexión real, y lo reactivamos apenas vuelva la señal. */
+async function hayConexionReal(timeoutMs = 2500){
+  try{
+    const controlador = new AbortController();
+    const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
+    await fetch(`https://www.gstatic.com/generate_204?_=${Date.now()}`, {
+      mode: "no-cors", cache: "no-store", signal: controlador.signal
+    });
+    clearTimeout(temporizador);
+    return true;
+  } catch(err){
+    return false;
+  }
+}
+
+const conexionInicialReal = await hayConexionReal();
+if (!conexionInicialReal) { try { await db.disableNetwork(); } catch(e){} }
+window.addEventListener("online", () => { hayConexionReal().then((online) => { if (online) db.enableNetwork().catch(() => {}); }); });
+window.addEventListener("offline", () => { db.disableNetwork().catch(() => {}); });
+
 /* =========================================================================
    COLA LOCAL DE FOTOS (IndexedDB) — para cuando no hay señal
    ========================================================================= */
@@ -934,7 +959,7 @@ async function deletePendingPhoto(id){
 async function decodificarReducido(file, maxWidth){
   if (window.createImageBitmap){
     try{
-      const bitmap = await createImageBitmap(file, { resizeWidth: maxWidth, resizeQuality: "medium" });
+      const bitmap = await createImageBitmap(file, { resizeWidth: maxWidth, resizeQuality: "low" });
       const canvas = document.createElement("canvas");
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;
@@ -972,7 +997,7 @@ function compressImage(file, maxWidth = 1000, quality = 0.6){
 
 /* Comprime la foto y le quema encima fecha/hora + coordenadas + precisión GPS,
    como prueba visual de dónde y cuándo se tomó (estilo "geotag camera"). */
-async function compressAndWatermark(file, meta, maxWidth = 1000, quality = 0.65){
+async function compressAndWatermark(file, meta, maxWidth = 800, quality = 0.6){
   const canvas = await decodificarReducido(file, maxWidth);
   const ctx = canvas.getContext("2d");
   const w = canvas.width, h = canvas.height;
@@ -1316,6 +1341,8 @@ $("#f-sitio").addEventListener("change", verificarContraSitio);
 /* =========================================================================
    CAPTURA DE FOTOS
    ========================================================================= */
+let previewURLs = { antes: null, despues: null };
+
 function attachPhotoInputListener(input){
   input.addEventListener("change", async (e) => {
     const slot = input.dataset.slot;
@@ -1333,7 +1360,9 @@ function attachPhotoInputListener(input){
     try{
       const compressed = await compressAndWatermark(file, meta);
       fotosSeleccionadas[slot] = compressed;
+      if (previewURLs[slot]) URL.revokeObjectURL(previewURLs[slot]);
       const url = URL.createObjectURL(compressed);
+      previewURLs[slot] = url;
       container.innerHTML = `<span class="tag">${slot}</span><img src="${url}"><span class="clear-btn" data-clear="${slot}">✕</span>`;
     } catch(err){
       console.error("Error procesando foto:", err);
@@ -1350,6 +1379,7 @@ document.addEventListener("click", (e) => {
     const slot = e.target.dataset.clear;
     fotosSeleccionadas[slot] = null;
     fotosMeta[slot] = null;
+    if (previewURLs[slot]) { URL.revokeObjectURL(previewURLs[slot]); previewURLs[slot] = null; }
     e.stopPropagation(); e.preventDefault();
     const container = $(`#slot-${slot}`);
     container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
@@ -1456,6 +1486,7 @@ $("#form-captura").addEventListener("submit", async (e) => {
     fotosSeleccionadas = { antes: null, despues: null };
     fotosMeta = { antes: null, despues: null };
     ["antes","despues"].forEach(slot => {
+      if (previewURLs[slot]) { URL.revokeObjectURL(previewURLs[slot]); previewURLs[slot] = null; }
       const container = $(`#slot-${slot}`);
       container.innerHTML = `<span class="tag">${slot}</span><span class="placeholder"><span class="icon">📷</span>Tomar foto</span><input type="file" accept="image/*" capture="environment" data-slot="${slot}">`;
       attachPhotoInputListener(container.querySelector('input'));
