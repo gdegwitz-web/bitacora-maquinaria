@@ -21,10 +21,16 @@
   // funcionar sin conexión la próxima vez.
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => {
+      navigator.serviceWorker.register("sw.js").then((reg) => {
+        window.__bitacoraSWEstado = "registrado (" + (reg.active ? "activo" : "instalando") + ")";
+        reg.addEventListener("updatefound", () => { window.__bitacoraSWEstado = "actualizando"; });
+      }).catch((err) => {
         console.warn("No se pudo registrar el service worker:", err);
+        window.__bitacoraSWEstado = "error: " + err.message;
       });
     });
+  } else {
+    window.__bitacoraSWEstado = "no soportado por este navegador";
   }
 
   // Red de seguridad: si a los 9 segundos el módulo principal (Firebase) no
@@ -34,17 +40,29 @@
   // uso sin conexión. El propio módulo marca window.__bitacoraListo = true
   // en cuanto logra resolver la sesión (con o sin usuario).
   window.__bitacoraListo = false;
-  setTimeout(() => {
+  window.__bitacoraSWEstado = "sin intentar";
+  setTimeout(async () => {
     if (window.__bitacoraListo) return;
     const splash = document.getElementById("screen-splash");
     if (!splash || splash.classList.contains("hidden")) return;
+
+    let regs = [];
+    try { regs = await navigator.serviceWorker.getRegistrations(); } catch(e){}
+    const diagnostico = [
+      `Conexión del navegador: ${navigator.onLine ? "en línea" : "sin conexión"}`,
+      `Service worker: ${window.__bitacoraSWEstado}`,
+      `Service workers registrados: ${regs.length}`,
+      `Controlando esta pestaña: ${navigator.serviceWorker.controller ? "sí" : "no"}`
+    ].join(" · ");
+
     splash.innerHTML = `
       <div class="splash-name" style="font-size:22px;">No se pudo conectar</div>
-      <div style="color:#93A0AC;font-size:13.5px;max-width:280px;margin-top:10px;line-height:1.5;">
+      <div style="color:#93A0AC;font-size:13.5px;max-width:300px;margin-top:10px;line-height:1.5;">
         Parece que no hay señal, y esta app todavía no había quedado guardada para
         abrir sin conexión en este dispositivo. Intenta de nuevo cuando tengas señal.
       </div>
       <button id="btn-reintentar-splash" style="margin-top:24px;padding:12px 22px;border-radius:6px;border:none;background:#E3A008;color:#1B1400;font-weight:600;font-family:inherit;font-size:14px;cursor:pointer;">Reintentar</button>
+      <div style="margin-top:26px;color:#5D6A75;font-size:9.5px;max-width:300px;font-family:'IBM Plex Mono',monospace;line-height:1.6;">${diagnostico}</div>
     `;
     document.getElementById("btn-reintentar-splash").onclick = () => location.reload();
   }, 9000);
