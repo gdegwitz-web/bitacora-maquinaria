@@ -39,7 +39,7 @@
     window.__bitacoraSWEstado = "no soportado por este navegador";
   }
 
-  // Red de seguridad: si a los 9 segundos el módulo principal (Firebase) no
+  // Red de seguridad: si a los 6 segundos el módulo principal (Firebase) no
   // logró confirmar el estado de sesión, no dejamos a la persona mirando la
   // pantalla de carga para siempre. Esto pasa normalmente cuando no hay señal
   // la primera vez que se abre la app, antes de que quede todo guardado para
@@ -71,7 +71,7 @@
       <div style="margin-top:26px;color:#5D6A75;font-size:9.5px;max-width:300px;font-family:'IBM Plex Mono',monospace;line-height:1.6;">${diagnostico}</div>
     `;
     document.getElementById("btn-reintentar-splash").onclick = () => location.reload();
-  }, 9000);
+  }, 6000);
 </script>
 <style>
   :root{
@@ -919,13 +919,15 @@ const storage = firebase.storage();
 
 try { await db.enablePersistence(); } catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
 
-/* navigator.onLine no siempre es confiable (en Android, en modo avión a
-   veces sigue reportando "en línea"). Si Firestore cree que hay red, intenta
-   establecer una conexión en vivo antes de rendirse y usar los datos
-   guardados localmente — eso es lo que puede tardar ~30 segundos. Con esta
-   verificación rápida (2.5s), ANTES de leer nada, forzamos el modo offline de
-   inmediato si no hay conexión real, y lo reactivamos apenas vuelva la señal. */
-async function hayConexionReal(timeoutMs = 2500){
+/* navigator.onLine no siempre es confiable en el sentido de que a veces
+   reporta "en línea" sin estarlo — pero cuando reporta "sin conexión" sí es
+   confiable (eso el navegador lo sabe con certeza). Aprovechamos eso: si ya
+   dice que no hay red, ni siquiera intentamos el ping y respondemos al
+   instante. Solo cuando dice "en línea" (que puede ser un falso positivo)
+   hacemos la verificación real, y con tiempos de espera cortos — ya no
+   necesitamos el margen amplio de las primeras pruebas. */
+async function hayConexionReal(timeoutMs = 1000){
+  if (navigator.onLine === false) return false;
   const intento = (async () => {
     try{
       const controlador = new AbortController();
@@ -942,7 +944,7 @@ async function hayConexionReal(timeoutMs = 2500){
   // Límite de tiempo absoluto: pase lo que pase con el fetch de arriba
   // (incluso si algo raro hace que ni siquiera el abort funcione bien), esta
   // función NUNCA debe dejar a la app esperando más de este tiempo.
-  const limiteAbsoluto = new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs + 1500));
+  const limiteAbsoluto = new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs + 700));
   return Promise.race([intento, limiteAbsoluto]);
 }
 
