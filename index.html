@@ -26,6 +26,19 @@
   // por falta de señal, esto igual se ejecuta y deja la app lista para
   // funcionar sin conexión la próxima vez.
   if ("serviceWorker" in navigator) {
+    // Cuando actualizamos sw.js, el navegador necesita un ciclo de "cargar
+    // página → notar la versión nueva → activarla" antes de que esa versión
+    // realmente tome el control. En vez de obligar a la persona a recargar
+    // manualmente dos veces para beneficiarse de la versión nueva, lo hacemos
+    // nosotros mismos, una sola vez y de forma automática, apenas se detecta
+    // el cambio de control.
+    let yaRecargoPorSW = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (yaRecargoPorSW) return;
+      yaRecargoPorSW = true;
+      window.location.reload();
+    });
+
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("sw.js").then((reg) => {
         window.__bitacoraSWEstado = "registrado (" + (reg.active ? "activo" : "instalando") + ")";
