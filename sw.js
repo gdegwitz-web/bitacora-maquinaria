@@ -11,7 +11,7 @@
    conexión al menos una vez para poder guardar la copia actualizada.
    ========================================================================= */
 
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const CACHE_NAME = `bitacora-maquinaria-${CACHE_VERSION}`;
 
 // Archivos propios de la app + las URLs exactas del SDK "compat" de Firebase
@@ -67,35 +67,50 @@ self.addEventListener("fetch", (event) => {
   if (req.url.includes("generate_204")) return;
 
   // Al ABRIR la app (navegación): intenta red primero (así siempre se ve la
-  // versión más reciente si hay señal), y si falla, usa la copia guardada.
+  // versión más reciente si hay señal), pero con un límite de tiempo corto —
+  // si el teléfono cree que hay red pero no la hay de verdad, el navegador
+  // podría tardar mucho en darse por vencido por su cuenta. Con este límite,
+  // a los 3 segundos como máximo usamos la copia guardada.
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req)
-        .then((res) => {
+      (async () => {
+        try{
+          const controlador = new AbortController();
+          const temporizador = setTimeout(() => controlador.abort(), 3000);
+          const res = await fetch(req, { signal: controlador.signal });
+          clearTimeout(temporizador);
           const copia = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(req, copia));
           return res;
-        })
-        .catch(() => caches.match(req).then((res) => res || caches.match("./index.html")))
+        } catch(err){
+          const cached = await caches.match(req);
+          return cached || caches.match("./index.html");
+        }
+      })()
     );
     return;
   }
 
   // Todo lo demás (CSS, JS, fuentes, íconos, SDK de Firebase, mapa): caché
   // primero (carga instantánea y funciona sin señal), y si no está guardado
-  // todavía, se busca en la red y se guarda para la próxima vez.
+  // todavía, se busca en la red (con el mismo límite corto) y se guarda para
+  // la próxima vez.
   event.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(req).then(async (cached) => {
       if (cached) return cached;
-      return fetch(req)
-        .then((res) => {
-          if (res && (res.ok || res.type === "opaque")) {
-            const copia = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copia));
-          }
-          return res;
-        })
-        .catch(() => cached);
+      try{
+        const controlador = new AbortController();
+        const temporizador = setTimeout(() => controlador.abort(), 3000);
+        const res = await fetch(req, { signal: controlador.signal });
+        clearTimeout(temporizador);
+        if (res && (res.ok || res.type === "opaque")) {
+          const copia = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, copia));
+        }
+        return res;
+      } catch(err){
+        return cached; // undefined si nunca se pudo guardar de antemano
+      }
     })
   );
 });
