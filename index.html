@@ -458,6 +458,39 @@
     .nav-item{flex-shrink:0;margin-bottom:0;}
     .main{padding:18px 16px 50px;}
   }
+
+  /* ---------- Informe ---------- */
+  #informe-imprimible{background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:26px 28px;}
+  .informe-header{border-bottom:2px solid var(--accent-amber);padding-bottom:14px;margin-bottom:18px;}
+  .informe-header-brand{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;color:var(--accent-amber);text-transform:uppercase;}
+  .informe-header h2{font-family:var(--font-display);font-size:28px;margin:4px 0;letter-spacing:.01em;}
+  .informe-meta{color:var(--text-muted);font-size:12.5px;line-height:1.6;}
+  .informe-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:18px 0 24px;}
+  @media(max-width:760px){.informe-stats{grid-template-columns:repeat(2,1fr);}}
+  .informe-stat{background:var(--bg-input);border:1px solid var(--line);border-radius:8px;padding:12px;text-align:center;}
+  .informe-stat-num{font-family:var(--font-display);font-size:26px;color:var(--accent-amber);}
+  .informe-stat div:last-child{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+  #informe-imprimible h3{font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:24px 0 12px;}
+  .informe-mapa{height:340px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--bg-input);}
+  .informe-tabla{width:100%;border-collapse:collapse;font-size:12px;}
+  .informe-tabla th{text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .informe-tabla td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  .informe-mono{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
+
+  @media print{
+    body *{visibility:hidden;}
+    #informe-imprimible, #informe-imprimible *{visibility:visible;}
+    #informe-imprimible{position:absolute;left:0;top:0;width:100%;border:none;padding:0;background:#fff;color:#111;}
+    .informe-header{border-bottom-color:#000;}
+    .informe-header-brand,.informe-meta,#informe-imprimible h3{color:#444;}
+    .informe-stat{background:#f2f2f2;border-color:#ccc;}
+    .informe-stat-num{color:#111;}
+    .informe-tabla th{color:#555;border-bottom-color:#999;}
+    .informe-tabla td{border-bottom-color:#ddd;color:#111;}
+    .informe-mapa{border-color:#999;page-break-inside:avoid;}
+    table{page-break-inside:auto;}
+    tr{page-break-inside:avoid;}
+  }
 </style>
 </head>
 <body>
@@ -636,6 +669,7 @@
     <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
     <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
     <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
+    <div class="nav-item hidden" data-view="informe" id="nav-informe"><span class="nav-icon">▦</span> Informe</div>
     <div class="sidebar-footer">
       <div class="sync-pill" id="sync-pill"><span class="sync-dot"></span><span id="sync-text">Conectando…</span></div>
       <div class="user-chip" id="user-chip" style="margin-top:12px;"></div>
@@ -928,6 +962,37 @@
           <thead><tr><th>Sitio</th><th>Coordenadas</th><th>Radio</th><th>Máquinas</th><th></th></tr></thead>
           <tbody id="tbody-sitios"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Informe (admin) ---- -->
+    <div class="view hidden" id="view-informe">
+      <h1 class="page-title">Generar informe</h1>
+      <p class="page-sub">Elige un rango de fechas para generar un informe imprimible con el detalle de inspecciones, máquinas, comentarios, alertas y un mapa de ubicaciones.</p>
+
+      <div class="chart-card" style="margin-bottom:20px;">
+        <div class="toolbar" style="margin-bottom:0;flex-wrap:wrap;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="label">Desde</label>
+            <input type="date" id="informe-desde">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="label">Hasta</label>
+            <input type="date" id="informe-hasta">
+          </div>
+          <select id="informe-contratista"><option value="">Todos los contratistas</option></select>
+          <select id="informe-estado">
+            <option value="">Cualquier estado</option>
+            <option value="operativa">Solo operativas</option>
+            <option value="novedad">Solo con novedad</option>
+          </select>
+          <button class="btn btn-primary btn-sm" id="btn-generar-informe">Generar vista previa</button>
+        </div>
+      </div>
+
+      <div id="informe-resultado" class="hidden">
+        <button class="btn btn-primary" id="btn-imprimir-informe" style="margin-bottom:18px;">🖨️ Imprimir / Guardar como PDF</button>
+        <div id="informe-imprimible"></div>
       </div>
     </div>
 
@@ -1409,6 +1474,7 @@ auth.onAuthStateChanged(async (user) => {
       $("#nav-panel").classList.remove("hidden");
       $("#nav-usuarios").classList.remove("hidden");
       $("#nav-sitios").classList.remove("hidden");
+      $("#nav-informe").classList.remove("hidden");
       cargarPanelAdmin();
       cargarUsuarios();
     }
@@ -1828,6 +1894,7 @@ function cargarPanelAdmin(){
     cacheRegistros = [];
     snap.forEach(d => cacheRegistros.push({ id: d.id, ...d.data() }));
     poblarFiltros();
+    poblarFiltroContratistaInforme();
     renderTablaPanel();
     renderStats();
     renderGraficos();
@@ -2433,6 +2500,170 @@ $("#form-sitio").addEventListener("submit", async (e) => {
     showToast("No se pudo guardar el sitio: " + err.message, "error");
   }
 });
+
+/* =========================================================================
+   INFORME IMPRIMIBLE
+   ========================================================================= */
+let informeDatos = [];
+let mapaInformeActual = null;
+
+function poblarFiltroContratistaInforme(){
+  const sel = $("#informe-contratista");
+  if (!sel) return;
+  const actual = sel.value;
+  const contratistas = [...new Set(cacheRegistros.map(r => r.contratista).filter(Boolean))].sort();
+  sel.innerHTML = `<option value="">Todos los contratistas</option>` + contratistas.map(c => `<option>${c}</option>`).join("");
+  sel.value = actual;
+}
+
+(function establecerFechasInformePorDefecto(){
+  const hoy = new Date();
+  const hace30 = new Date(hoy); hace30.setDate(hoy.getDate() - 30);
+  const fmt = (d) => d.toISOString().slice(0,10);
+  if ($("#informe-desde")) $("#informe-desde").value = fmt(hace30);
+  if ($("#informe-hasta")) $("#informe-hasta").value = fmt(hoy);
+})();
+
+$("#btn-generar-informe").onclick = async () => {
+  const desde = $("#informe-desde").value;
+  const hasta = $("#informe-hasta").value;
+  if (!desde || !hasta){ showToast("Selecciona la fecha de inicio y de fin.", "error"); return; }
+  if (desde > hasta){ showToast("La fecha 'Desde' no puede ser posterior a 'Hasta'.", "error"); return; }
+  const contratista = $("#informe-contratista").value;
+  const estado = $("#informe-estado").value;
+
+  informeDatos = cacheRegistros.filter(r => {
+    if (!r.timestampCaptura) return false;
+    const fecha = r.timestampCaptura.slice(0,10);
+    if (fecha < desde || fecha > hasta) return false;
+    if (contratista && r.contratista !== contratista) return false;
+    if (estado === "operativa" && r.estadoMaquina === "novedad") return false;
+    if (estado === "novedad" && r.estadoMaquina !== "novedad") return false;
+    return true;
+  }).sort((a,b) => (a.timestampCaptura||"").localeCompare(b.timestampCaptura||""));
+
+  if (informeDatos.length === 0){
+    showToast("No hay registros en ese rango con esos filtros.", "error");
+    $("#informe-resultado").classList.add("hidden");
+    return;
+  }
+
+  const btn = $("#btn-generar-informe");
+  btn.disabled = true; btn.textContent = "Generando…";
+  await renderizarInforme(desde, hasta, contratista, estado);
+  btn.disabled = false; btn.textContent = "Generar vista previa";
+
+  $("#informe-resultado").classList.remove("hidden");
+  $("#informe-resultado").scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+async function renderizarInforme(desde, hasta, contratista, estado){
+  const total = informeDatos.length;
+  const maquinas = new Set(informeDatos.map(r => r.codigoMaquina)).size;
+  const sitios = new Set(informeDatos.map(r => r.sitioNombre).filter(Boolean)).size;
+  const novedades = informeDatos.filter(r => r.estadoMaquina === "novedad").length;
+  const alertas = informeDatos.filter(r => r.alertaUbicacion || r.alertaReloj).length;
+
+  const filtrosTexto = [
+    contratista ? `Contratista: ${contratista}` : null,
+    estado ? `Estado: ${estado === "novedad" ? "Con novedad" : "Operativas"}` : null
+  ].filter(Boolean).join(" · ");
+
+  const filas = informeDatos.map(r => {
+    const alertasTxt = [
+      r.alertaUbicacion ? `Fuera de zona (${r.distanciaAlSitioM ?? '—'} m)` : null,
+      r.alertaReloj ? `Reloj ±${r.driftRelojMinutos ?? '—'} min` : null
+    ].filter(Boolean).join(" · ") || "—";
+    return `
+    <tr>
+      <td>${formatFecha(r.timestampCaptura)}</td>
+      <td>${r.turno || '—'}</td>
+      <td>${r.tipoMaquinaCodigo || r.tipoMaquina}<br><span class="informe-mono">Unidad ${r.codigoMaquina}</span></td>
+      <td>${r.contratista}</td>
+      <td>${r.operador}</td>
+      <td>${r.estadoMaquina === 'novedad' ? '⚠ Novedad' : '✓ Operativa'}</td>
+      <td>${r.sitioNombre || '—'}</td>
+      <td>${alertasTxt}</td>
+      <td style="max-width:220px;">${r.notas || '—'}</td>
+    </tr>`;
+  }).join("");
+
+  $("#informe-imprimible").innerHTML = `
+    <div class="informe-header">
+      <div class="informe-header-brand">Bitácora de Maquinaria — Auditoría de Remoción de Escombros</div>
+      <h2>Informe de inspecciones</h2>
+      <div class="informe-meta">
+        Periodo: ${desde} a ${hasta}${filtrosTexto ? ' · ' + filtrosTexto : ''}<br>
+        Generado el ${new Date().toLocaleString('es-VE')} por ${currentUser?.email || ''}
+      </div>
+    </div>
+
+    <div class="informe-stats">
+      <div class="informe-stat"><div class="informe-stat-num">${total}</div><div>Inspecciones</div></div>
+      <div class="informe-stat"><div class="informe-stat-num">${maquinas}</div><div>Máquinas distintas</div></div>
+      <div class="informe-stat"><div class="informe-stat-num">${sitios}</div><div>Sitios visitados</div></div>
+      <div class="informe-stat"><div class="informe-stat-num">${novedades}</div><div>Con novedad</div></div>
+      <div class="informe-stat"><div class="informe-stat-num">${alertas}</div><div>Con alertas</div></div>
+    </div>
+
+    <h3>Mapa de ubicaciones</h3>
+    <div id="informe-mapa" class="informe-mapa"></div>
+
+    <h3>Detalle de inspecciones (${total})</h3>
+    <table class="informe-tabla">
+      <thead><tr><th>Fecha</th><th>Turno</th><th>Máquina</th><th>Contratista</th><th>Operador</th><th>Estado</th><th>Sitio</th><th>Alertas</th><th>Comentario</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  `;
+
+  await dibujarMapaInforme(informeDatos);
+}
+
+async function dibujarMapaInforme(registros){
+  const contenedor = document.getElementById("informe-mapa");
+  if (!contenedor) return;
+  if (mapaInformeActual){ mapaInformeActual.remove(); mapaInformeActual = null; }
+
+  try{
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Cargando mapa…</div>`;
+    await cargarLeafletSiHaceFalta();
+  } catch(err){
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;text-align:center;padding:12px;">No se pudo cargar el mapa (necesita conexión la primera vez).</div>`;
+    return;
+  }
+  contenedor.innerHTML = "";
+  if (!window.L) return;
+
+  const map = L.map(contenedor, { attributionControl: false, zoomControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  const puntos = [];
+  registros.forEach(r => {
+    if (r.ubicacion?.lat != null){
+      const alerta = r.alertaUbicacion || r.alertaReloj;
+      L.circleMarker([r.ubicacion.lat, r.ubicacion.lng], {
+        radius: 6, color: alerta ? "#D6533F" : "#4A9F6E", fillColor: alerta ? "#D6533F" : "#4A9F6E",
+        fillOpacity: 0.85, weight: 2
+      }).addTo(map).bindPopup(
+        `<strong>${r.tipoMaquinaCodigo || r.tipoMaquina}</strong> · Unidad ${r.codigoMaquina}<br>${formatFecha(r.timestampCaptura)}<br>${r.contratista}`
+      );
+      puntos.push([r.ubicacion.lat, r.ubicacion.lng]);
+    }
+  });
+
+  if (puntos.length){
+    map.fitBounds(puntos, { padding: [28,28], maxZoom: 16 });
+  } else {
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Ningún registro de este periodo tiene coordenadas guardadas.</div>`;
+    map.remove();
+    return;
+  }
+  mapaInformeActual = map;
+}
+
+$("#btn-imprimir-informe").onclick = () => window.print();
 
 refreshSyncPill();
 </script>
