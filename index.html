@@ -281,6 +281,16 @@
     width:220px;flex-shrink:0;background:var(--bg-panel);border-right:1px solid var(--line);
     display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;
   }
+  .sidebar-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:22px;}
+  .btn-logout-icon{
+    background:transparent;border:1px solid var(--line);color:var(--text-muted);border-radius:6px;
+    width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:15px;line-height:1;
+  }
+  .btn-logout-icon:hover{border-color:var(--danger);color:#FF9A85;}
+  .nav-scroll-wrap{position:relative;}
+  .nav-scroll{display:flex;flex-direction:column;}
+  .nav-scroll-fade{display:none;}
   .nav-item{
     display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:var(--radius);
     color:var(--text-muted);font-size:14px;font-weight:500;cursor:pointer;margin-bottom:2px;
@@ -453,9 +463,18 @@
 
   @media(max-width:820px){
     #app.active{flex-direction:column;}
-    .sidebar{width:100%;height:auto;position:relative;flex-direction:row;overflow-x:auto;padding:10px 12px;gap:4px;}
+    .sidebar{width:100%;height:auto;position:relative;flex-direction:column;padding:10px 12px;gap:0;}
+    .sidebar-top{margin-bottom:10px;}
     .sidebar-footer{display:none;}
-    .nav-item{flex-shrink:0;margin-bottom:0;}
+    .nav-scroll{flex-direction:row;overflow-x:auto;gap:4px;scrollbar-width:none;}
+    .nav-scroll::-webkit-scrollbar{display:none;}
+    .nav-item{flex-shrink:0;margin-bottom:0;white-space:nowrap;}
+    .nav-scroll-fade{
+      display:flex;align-items:center;justify-content:flex-end;position:absolute;top:0;right:0;bottom:0;
+      width:34px;background:linear-gradient(to right, transparent, var(--bg-panel) 60%);
+      color:var(--accent-amber);font-size:18px;pointer-events:none;padding-right:2px;
+    }
+    .nav-scroll-fade.oculta{display:none;}
     .main{padding:18px 16px 50px;}
   }
 
@@ -654,32 +673,42 @@
 <!-- ============ APP ============ -->
 <div id="app">
   <div class="sidebar">
-    <div class="brand" style="margin-bottom:22px;">
-      <div class="icon-badge icon-badge-xs">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <rect width="100" height="100" fill="#E3A008"/>
-          <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
-          <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
-          <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
-          <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
-          <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
-          <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
-          <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
-          <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
-          <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
-          <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
-          <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
-          <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
-        </svg>
+    <div class="sidebar-top">
+      <div class="brand" style="margin-bottom:0;">
+        <div class="icon-badge icon-badge-xs">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" fill="#E3A008"/>
+            <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+            <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+            <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+            <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+            <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+            <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+            <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+            <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+            <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+            <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+            <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+            <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+          </svg>
+        </div>
+        <div class="brand-name" style="font-size:17px;">BITÁCORA</div>
       </div>
-      <div class="brand-name" style="font-size:17px;">BITÁCORA</div>
+      <button class="btn-logout-icon" id="btn-logout-icon" title="Cerrar sesión">⏻</button>
     </div>
-    <div class="nav-item" data-view="captura" id="nav-captura"><span class="nav-icon">＋</span> Nuevo registro</div>
-    <div class="nav-item" data-view="mis-registros" id="nav-mis-registros"><span class="nav-icon">☰</span> Mis registros</div>
-    <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
-    <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
-    <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
-    <div class="nav-item hidden" data-view="informe" id="nav-informe"><span class="nav-icon">▦</span> Informe</div>
+
+    <div class="nav-scroll-wrap">
+      <div class="nav-scroll">
+        <div class="nav-item" data-view="captura" id="nav-captura"><span class="nav-icon">＋</span> Nuevo registro</div>
+        <div class="nav-item" data-view="mis-registros" id="nav-mis-registros"><span class="nav-icon">☰</span> Mis registros</div>
+        <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
+        <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
+        <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
+        <div class="nav-item hidden" data-view="informe" id="nav-informe"><span class="nav-icon">▦</span> Informe</div>
+      </div>
+      <div class="nav-scroll-fade" id="nav-scroll-fade">›</div>
+    </div>
+
     <div class="sidebar-footer">
       <div class="sync-pill" id="sync-pill"><span class="sync-dot"></span><span id="sync-text">Conectando…</span></div>
       <div class="user-chip" id="user-chip" style="margin-top:12px;"></div>
@@ -1460,6 +1489,7 @@ $("#btn-welcome-continue").onclick = () => {
 $("#btn-login-back").onclick = () => mostrarPantallaAuth("welcome");
 
 $("#btn-logout").onclick = () => auth.signOut();
+$("#btn-logout-icon").onclick = () => auth.signOut();
 
 $("#btn-modo-prueba").onclick = () => {
   const activando = !modoPrueba;
@@ -1490,7 +1520,7 @@ auth.onAuthStateChanged(async (user) => {
     }
     cargarSitios();
     cargarMisRegistros();
-    goToView("captura");
+    goToView(currentRole === "admin" ? "panel" : "captura");
     refreshSyncPill();
     syncPendingPhotos();
   } else {
@@ -1517,6 +1547,21 @@ function goToView(name){
   }
 }
 $all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
+
+/* Flecha que indica que hay más pestañas fuera de vista en la franja de
+   navegación móvil — solo se muestra si de verdad hay contenido oculto a la
+   derecha, y desaparece sola cuando ya se llegó al final. */
+function actualizarFlechaNav(){
+  const scroll = $(".nav-scroll");
+  const flecha = $("#nav-scroll-fade");
+  if (!scroll || !flecha) return;
+  const quedaPorVer = scroll.scrollWidth - scroll.clientWidth - scroll.scrollLeft > 12;
+  flecha.classList.toggle("oculta", !quedaPorVer);
+}
+$(".nav-scroll")?.addEventListener("scroll", actualizarFlechaNav);
+window.addEventListener("resize", actualizarFlechaNav);
+new MutationObserver(actualizarFlechaNav).observe($(".nav-scroll"), { attributeFilter: ["class"], subtree: true });
+setTimeout(actualizarFlechaNav, 300);
 
 /* =========================================================================
    DETECCIÓN AUTOMÁTICA DE UBICACIÓN, SITIO Y MÁQUINAS SUGERIDAS
