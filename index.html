@@ -268,6 +268,24 @@
   }
   .maquina-asignada-fila .maf-info{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);}
 
+  .checklist-item{
+    display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:var(--radius);
+    margin-bottom:6px;cursor:pointer;font-size:13.5px;
+  }
+  .checklist-item:has(input:checked){border-color:var(--accent-amber);background:var(--accent-amber-soft);}
+  .checklist-item input{accent-color:var(--accent-amber);width:16px;height:16px;flex-shrink:0;}
+
+  .sitio-asignado-card{
+    background:var(--bg-panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:12px;
+  }
+  .sitio-asignado-card h3{font-family:var(--font-display);font-size:19px;margin:0 0 4px;letter-spacing:.01em;}
+  .sitio-asignado-card .sac-radio{color:var(--text-faint);font-size:11.5px;font-family:var(--font-mono);margin-bottom:10px;}
+  .sac-maquina{
+    display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg-input);
+    border-radius:6px;margin-bottom:6px;font-size:13px;
+  }
+  .sac-maquina .sac-tipo{color:var(--text-faint);font-family:var(--font-mono);font-size:11px;}
+
   @media(max-width:400px){
     .icon-badge-lg{width:84px;height:84px;}
     .splash-name{font-size:28px;}
@@ -701,6 +719,7 @@
       <div class="nav-scroll">
         <div class="nav-item" data-view="captura" id="nav-captura"><span class="nav-icon">＋</span> Nuevo registro</div>
         <div class="nav-item" data-view="mis-registros" id="nav-mis-registros"><span class="nav-icon">☰</span> Mis registros</div>
+        <div class="nav-item hidden" data-view="mis-sitios" id="nav-mis-sitios"><span class="nav-icon">⌖</span> Mis sitios</div>
         <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
         <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
         <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
@@ -828,6 +847,14 @@
           <tbody id="tbody-mis-registros"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- ---- VIEW: Mis sitios (campo) ---- -->
+    <div class="view hidden" id="view-mis-sitios">
+      <h1 class="page-title">Mis sitios</h1>
+      <p class="page-sub">Los sitios que tienes asignados y qué máquinas deberías encontrar en cada uno.</p>
+      <div id="mis-sitios-mapa" class="informe-mapa" style="height:320px;margin-bottom:20px;"></div>
+      <div id="mis-sitios-lista"></div>
     </div>
 
     <!-- ---- VIEW: Panel admin ---- -->
@@ -989,6 +1016,12 @@
               </div>
             </div>
             <button type="button" class="btn btn-ghost btn-sm btn-block" id="btn-agregar-maquina-sitio" style="margin-bottom:16px;">+ Agregar máquina a la lista</button>
+
+            <div class="section-title">Personal de campo asignado</div>
+            <div class="field">
+              <div id="checklist-inspectores"></div>
+              <div class="label" style="margin-top:6px;">Si no marcas a nadie, el sitio se muestra a todo el personal de campo por defecto.</div>
+            </div>
 
             <button type="submit" class="btn btn-primary btn-block" id="btn-guardar-sitio">Agregar sitio</button>
             <button type="button" class="btn btn-ghost btn-block hidden" id="btn-cancelar-edicion-sitio" style="margin-top:8px;">Cancelar edición</button>
@@ -1347,6 +1380,7 @@ let fotosMeta = { antes: null, despues: null }; // {lat,lng,precision,timestamp}
 let unsubRegistros = null;
 let cacheRegistros = [];
 let cacheSitios = [];
+let cacheUsuarios = [];
 
 const $ = (sel) => document.querySelector(sel);
 const $all = (sel) => document.querySelectorAll(sel);
@@ -1517,6 +1551,8 @@ auth.onAuthStateChanged(async (user) => {
       $("#nav-informe").classList.remove("hidden");
       cargarPanelAdmin();
       cargarUsuarios();
+    } else {
+      $("#nav-mis-sitios").classList.remove("hidden");
     }
     cargarSitios();
     cargarMisRegistros();
@@ -1545,6 +1581,7 @@ function goToView(name){
   if (name === "captura" && !$("#f-tipo").value && !$("#f-codigo").value){
     detectarUbicacionYMaquinas(false);
   }
+  if (name === "mis-sitios") renderMisSitios();
 }
 $all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
 
@@ -2329,8 +2366,10 @@ async function cargarUsuarios(){
   const tbody = $("#tbody-usuarios");
   tbody.innerHTML = "";
   const emailsRegistrados = new Set();
+  cacheUsuarios = [];
   snap.forEach(d => {
     const u = d.data();
+    cacheUsuarios.push({ id: d.id, ...u });
     emailsRegistrados.add(u.email);
     const solicitudBadge = u.rolSolicitado === "admin" && u.role !== "admin" ? ` <span class="badge badge-pending">Solicita admin</span>` : "";
     const tr = document.createElement("tr");
@@ -2351,6 +2390,7 @@ async function cargarUsuarios(){
     tbody.appendChild(tr);
   });
   cargarPreautorizados(emailsRegistrados);
+  renderChecklistInspectores();
 }
 
 async function cargarPreautorizados(emailsRegistrados){
@@ -2412,6 +2452,83 @@ async function cargarSitios(){
   selectCampo.value = valorActual;
 
   if (currentRole === "admin") renderTablaSitios();
+  if (currentRole !== "admin" && !$("#view-mis-sitios").classList.contains("hidden")) renderMisSitios();
+}
+
+/* ---------- Mis sitios (personal de campo) ---------- */
+let mapaMisSitiosActual = null;
+
+function sitiosAsignadosAMi(){
+  if (!currentUser) return [];
+  // Un sitio sin lista de inspectores asignados se considera abierto a
+  // todo el personal de campo (así el admin no tiene que configurar esto
+  // para cada sitio desde el primer día).
+  return cacheSitios.filter(s => !s.inspectoresAsignados?.length || s.inspectoresAsignados.includes(currentUser.uid));
+}
+
+async function renderMisSitios(){
+  const mios = sitiosAsignadosAMi();
+  const lista = $("#mis-sitios-lista");
+
+  if (mios.length === 0){
+    lista.innerHTML = `<p style="color:var(--text-faint);font-size:13.5px;">Todavía no tienes sitios asignados. Habla con tu administrador.</p>`;
+  } else {
+    lista.innerHTML = mios.map(s => {
+      const maquinas = s.maquinasAsignadas || [];
+      return `
+      <div class="sitio-asignado-card">
+        <h3>${s.nombre}</h3>
+        <div class="sac-radio">Radio de verificación: ${s.radio} m</div>
+        ${maquinas.length ? maquinas.map(m => {
+          const cat = buscarMaquina(m.tipoMaquinaCodigo);
+          return `<div class="sac-maquina"><span>${cat ? cat.nombre : m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</span><span class="sac-tipo">${m.contratista || ''}</span></div>`;
+        }).join("") : `<div style="color:var(--text-faint);font-size:12.5px;">Sin máquinas asignadas registradas para este sitio.</div>`}
+      </div>`;
+    }).join("");
+  }
+
+  await dibujarMapaMisSitios(mios);
+}
+
+async function dibujarMapaMisSitios(sitios){
+  const contenedor = document.getElementById("mis-sitios-mapa");
+  if (!contenedor) return;
+  if (mapaMisSitiosActual){ mapaMisSitiosActual.remove(); mapaMisSitiosActual = null; }
+
+  try{
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Cargando mapa…</div>`;
+    await cargarLeafletSiHaceFalta();
+  } catch(err){
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;text-align:center;padding:12px;">No se pudo cargar el mapa (necesita conexión la primera vez).</div>`;
+    return;
+  }
+  contenedor.innerHTML = "";
+  if (!window.L) return;
+
+  const map = L.map(contenedor, { attributionControl: false, zoomControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  const puntos = [];
+  sitios.forEach(s => {
+    L.circle([s.lat, s.lng], { radius: s.radio, color: "#E3A008", fillColor: "#E3A008", fillOpacity: 0.1, weight: 2 }).addTo(map);
+    L.circleMarker([s.lat, s.lng], { radius: 8, color: "#fff", weight: 2, fillColor: "#E3A008", fillOpacity: 0.95 })
+      .addTo(map)
+      .bindTooltip(`<strong>${s.nombre}</strong>`, { permanent: true, direction: "top", offset: [0,-8] });
+    puntos.push([s.lat, s.lng]);
+  });
+
+  if (puntos.length){
+    map.fitBounds(puntos, { padding: [36,36], maxZoom: 16 });
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => { map.invalidateSize(); map.fitBounds(puntos, { padding: [36,36], maxZoom: 16 }); }, 250);
+  } else {
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Ningún sitio asignado tiene coordenadas.</div>`;
+    map.remove();
+    return;
+  }
+  mapaMisSitiosActual = map;
 }
 
 function renderTablaSitios(){
@@ -2457,6 +2574,7 @@ $("#btn-sitio-gps").onclick = async () => {
 
 /* ---------- Máquinas asignadas a un sitio (mientras se arma el formulario) ---------- */
 let maquinasAsignadasTemp = [];
+let inspectoresAsignadosTemp = [];
 
 function poblarSelectMaquinariaSitio(){
   const sel = $("#sm-tipo");
@@ -2486,6 +2604,28 @@ function renderListaMaquinasAsignadas(){
 }
 renderListaMaquinasAsignadas();
 
+function renderChecklistInspectores(){
+  const cont = $("#checklist-inspectores");
+  if (!cont) return;
+  const inspectores = cacheUsuarios.filter(u => u.role !== "admin");
+  if (inspectores.length === 0){
+    cont.innerHTML = `<div style="color:var(--text-faint);font-size:12.5px;">Todavía no hay personal de campo registrado.</div>`;
+    return;
+  }
+  cont.innerHTML = inspectores.map(u => `
+    <label class="checklist-item">
+      <input type="checkbox" value="${u.id}" ${inspectoresAsignadosTemp.includes(u.id) ? "checked" : ""}>
+      <span>${u.nombre || u.email}</span>
+    </label>`).join("");
+  $all("#checklist-inspectores input[type=checkbox]").forEach(chk => chk.onchange = () => {
+    if (chk.checked){
+      if (!inspectoresAsignadosTemp.includes(chk.value)) inspectoresAsignadosTemp.push(chk.value);
+    } else {
+      inspectoresAsignadosTemp = inspectoresAsignadosTemp.filter(id => id !== chk.value);
+    }
+  });
+}
+
 $("#btn-agregar-maquina-sitio").onclick = () => {
   const tipo = $("#sm-tipo").value;
   const codigo = $("#sm-codigo").value.trim();
@@ -2508,7 +2648,9 @@ function cargarSitioParaEditar(id){
   $("#s-lng").value = sitio.lng;
   $("#s-radio").value = sitio.radio;
   maquinasAsignadasTemp = JSON.parse(JSON.stringify(sitio.maquinasAsignadas || []));
+  inspectoresAsignadosTemp = [...(sitio.inspectoresAsignados || [])];
   renderListaMaquinasAsignadas();
+  renderChecklistInspectores();
   $("#sitio-form-title").textContent = `Editando: ${sitio.nombre}`;
   $("#btn-guardar-sitio").textContent = "Guardar cambios";
   $("#btn-cancelar-edicion-sitio").classList.remove("hidden");
@@ -2520,7 +2662,9 @@ function cancelarEdicionSitio(){
   $("#s-editando-id").value = "";
   $("#s-radio").value = 250;
   maquinasAsignadasTemp = [];
+  inspectoresAsignadosTemp = [];
   renderListaMaquinasAsignadas();
+  renderChecklistInspectores();
   $("#sitio-form-title").textContent = "Nuevo sitio";
   $("#btn-guardar-sitio").textContent = "Agregar sitio";
   $("#btn-cancelar-edicion-sitio").classList.add("hidden");
@@ -2535,7 +2679,8 @@ $("#form-sitio").addEventListener("submit", async (e) => {
     lat: parseFloat($("#s-lat").value),
     lng: parseFloat($("#s-lng").value),
     radio: parseFloat($("#s-radio").value) || 250,
-    maquinasAsignadas: maquinasAsignadasTemp
+    maquinasAsignadas: maquinasAsignadasTemp,
+    inspectoresAsignados: inspectoresAsignadosTemp
   };
   try{
     if (idEditando){
