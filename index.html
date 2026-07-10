@@ -476,6 +476,13 @@
   .informe-tabla th{text-align:left;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
   .informe-tabla td{padding:8px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
   .informe-mono{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
+  .informe-leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-bottom:10px;}
+  .informe-leyenda i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+  .informe-tooltip-maquina{font-family:var(--font-mono);font-size:11px;line-height:1.4;color:#111;text-align:center;}
+  .leaflet-tooltip-top.leaflet-tooltip{
+    background:#fff;border:1px solid #999;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:4px 7px;
+  }
+  .leaflet-tooltip-top.leaflet-tooltip::before{border-top-color:#999;}
 
   @media print{
     body *{visibility:hidden;}
@@ -488,8 +495,11 @@
     .informe-tabla th{color:#555;border-bottom-color:#999;}
     .informe-tabla td{border-bottom-color:#ddd;color:#111;}
     .informe-mapa{border-color:#999;page-break-inside:avoid;}
+    .informe-leyenda{color:#444;}
+    .leaflet-control-zoom, .leaflet-control-attribution{display:none !important;}
     table{page-break-inside:auto;}
     tr{page-break-inside:avoid;}
+    h3{page-break-after:avoid;}
   }
 </style>
 </head>
@@ -2524,6 +2534,56 @@ function poblarFiltroContratistaInforme(){
   if ($("#informe-hasta")) $("#informe-hasta").value = fmt(hoy);
 })();
 
+/* ---------- Agregaciones ---------- */
+function colorPorOperatividad(pct){
+  return pct >= 90 ? "#4A9F6E" : pct >= 70 ? "#E3A008" : "#D6533F";
+}
+
+function agruparPorMaquina(registros){
+  const mapa = new Map();
+  registros.forEach(r => {
+    const key = r.codigoMaquina;
+    if (!key) return;
+    if (!mapa.has(key)) mapa.set(key, {
+      codigoMaquina: key, tipoMaquinaCodigo: r.tipoMaquinaCodigo, tipoMaquina: r.tipoMaquina,
+      contratistas: new Set(), revisiones: 0, operativas: 0, novedades: 0, alertas: 0,
+      ultimaUbicacion: null, ultimaFecha: ""
+    });
+    const m = mapa.get(key);
+    m.revisiones++;
+    if (r.estadoMaquina === "novedad") m.novedades++; else m.operativas++;
+    if (r.alertaUbicacion || r.alertaReloj) m.alertas++;
+    if (r.contratista) m.contratistas.add(r.contratista);
+    if (r.ubicacion?.lat != null && (r.timestampCaptura || "") > m.ultimaFecha){
+      m.ultimaUbicacion = r.ubicacion;
+      m.ultimaFecha = r.timestampCaptura;
+    }
+  });
+  return [...mapa.values()].map(m => ({
+    ...m,
+    contratista: [...m.contratistas].join(", ") || "—",
+    porcentajeOperativa: m.revisiones ? Math.round((m.operativas / m.revisiones) * 100) : 0
+  })).sort((a,b) => b.revisiones - a.revisiones);
+}
+
+function agruparPorContratista(registros){
+  const mapa = new Map();
+  registros.forEach(r => {
+    const key = r.contratista || "Sin especificar";
+    if (!mapa.has(key)) mapa.set(key, { contratista: key, maquinas: new Set(), revisiones: 0, operativas: 0, novedades: 0, alertas: 0 });
+    const c = mapa.get(key);
+    c.revisiones++;
+    if (r.codigoMaquina) c.maquinas.add(r.codigoMaquina);
+    if (r.estadoMaquina === "novedad") c.novedades++; else c.operativas++;
+    if (r.alertaUbicacion || r.alertaReloj) c.alertas++;
+  });
+  return [...mapa.values()].map(c => ({
+    ...c,
+    maquinasCount: c.maquinas.size,
+    porcentajeOperativa: c.revisiones ? Math.round((c.operativas / c.revisiones) * 100) : 0
+  })).sort((a,b) => b.revisiones - a.revisiones);
+}
+
 $("#btn-generar-informe").onclick = async () => {
   const desde = $("#informe-desde").value;
   const hasta = $("#informe-hasta").value;
@@ -2550,41 +2610,76 @@ $("#btn-generar-informe").onclick = async () => {
 
   const btn = $("#btn-generar-informe");
   btn.disabled = true; btn.textContent = "Generando…";
-  await renderizarInforme(desde, hasta, contratista, estado);
-  btn.disabled = false; btn.textContent = "Generar vista previa";
 
+  renderizarInforme(desde, hasta, contratista, estado);
+  // Mostramos el contenedor ANTES de crear el mapa — Leaflet necesita medir
+  // un contenedor ya visible, o el mapa sale mal (esto era el bug anterior).
   $("#informe-resultado").classList.remove("hidden");
+  await dibujarMapaInforme(informeDatos);
+
+  btn.disabled = false; btn.textContent = "Generar vista previa";
   $("#informe-resultado").scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
-async function renderizarInforme(desde, hasta, contratista, estado){
+function renderizarInforme(desde, hasta, contratista, estado){
   const total = informeDatos.length;
-  const maquinas = new Set(informeDatos.map(r => r.codigoMaquina)).size;
+  const porMaquina = agruparPorMaquina(informeDatos);
+  const porContratista = agruparPorContratista(informeDatos);
   const sitios = new Set(informeDatos.map(r => r.sitioNombre).filter(Boolean)).size;
   const novedades = informeDatos.filter(r => r.estadoMaquina === "novedad").length;
   const alertas = informeDatos.filter(r => r.alertaUbicacion || r.alertaReloj).length;
+  const operatividadGeneral = total ? Math.round(((total - novedades) / total) * 100) : 0;
 
   const filtrosTexto = [
     contratista ? `Contratista: ${contratista}` : null,
     estado ? `Estado: ${estado === "novedad" ? "Con novedad" : "Operativas"}` : null
   ].filter(Boolean).join(" · ");
 
-  const filas = informeDatos.map(r => {
-    const alertasTxt = [
-      r.alertaUbicacion ? `Fuera de zona (${r.distanciaAlSitioM ?? '—'} m)` : null,
-      r.alertaReloj ? `Reloj ±${r.driftRelojMinutos ?? '—'} min` : null
-    ].filter(Boolean).join(" · ") || "—";
+  const filasMaquina = porMaquina.map(m => `
+    <tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${colorPorOperatividad(m.porcentajeOperativa)};margin-right:6px;"></span>${m.codigoMaquina}</td>
+      <td>${m.tipoMaquinaCodigo || m.tipoMaquina}</td>
+      <td>${m.contratista}</td>
+      <td style="text-align:center;">${m.revisiones}</td>
+      <td style="text-align:center;">${m.novedades}</td>
+      <td style="text-align:center;">${m.alertas}</td>
+      <td style="text-align:center;font-weight:600;">${m.porcentajeOperativa}%</td>
+    </tr>`).join("");
+
+  const filasContratista = porContratista.map(c => `
+    <tr>
+      <td>${c.contratista}</td>
+      <td style="text-align:center;">${c.maquinasCount}</td>
+      <td style="text-align:center;">${c.revisiones}</td>
+      <td style="text-align:center;">${c.novedades}</td>
+      <td style="text-align:center;">${c.alertas}</td>
+      <td style="text-align:center;font-weight:600;">${c.porcentajeOperativa}%</td>
+    </tr>`).join("");
+
+  const registrosNovedad = informeDatos.filter(r => r.estadoMaquina === "novedad")
+    .sort((a,b) => (b.timestampCaptura||"").localeCompare(a.timestampCaptura||""));
+  const filasCausas = registrosNovedad.map(r => `
+    <tr>
+      <td>${formatFecha(r.timestampCaptura)}</td>
+      <td>${r.codigoMaquina}<br><span class="informe-mono">${r.tipoMaquinaCodigo || r.tipoMaquina}</span></td>
+      <td>${r.contratista}</td>
+      <td>${r.sitioNombre || '—'}</td>
+      <td>${r.notas || '—'}</td>
+    </tr>`).join("");
+
+  const registrosAlerta = informeDatos.filter(r => r.alertaUbicacion || r.alertaReloj)
+    .sort((a,b) => (b.timestampCaptura||"").localeCompare(a.timestampCaptura||""));
+  const filasAlertas = registrosAlerta.map(r => {
+    const tipos = [
+      r.alertaUbicacion ? `Fuera de zona (${r.distanciaAlSitioM ?? '—'} m del sitio declarado)` : null,
+      r.alertaReloj ? `Reloj del dispositivo ±${r.driftRelojMinutos ?? '—'} min` : null
+    ].filter(Boolean).join(" · ");
     return `
     <tr>
       <td>${formatFecha(r.timestampCaptura)}</td>
-      <td>${r.turno || '—'}</td>
-      <td>${r.tipoMaquinaCodigo || r.tipoMaquina}<br><span class="informe-mono">Unidad ${r.codigoMaquina}</span></td>
+      <td>${r.codigoMaquina}<br><span class="informe-mono">${r.tipoMaquinaCodigo || r.tipoMaquina}</span></td>
       <td>${r.contratista}</td>
-      <td>${r.operador}</td>
-      <td>${r.estadoMaquina === 'novedad' ? '⚠ Novedad' : '✓ Operativa'}</td>
-      <td>${r.sitioNombre || '—'}</td>
-      <td>${alertasTxt}</td>
-      <td style="max-width:220px;">${r.notas || '—'}</td>
+      <td>${tipos}</td>
     </tr>`;
   }).join("");
 
@@ -2600,23 +2695,46 @@ async function renderizarInforme(desde, hasta, contratista, estado){
 
     <div class="informe-stats">
       <div class="informe-stat"><div class="informe-stat-num">${total}</div><div>Inspecciones</div></div>
-      <div class="informe-stat"><div class="informe-stat-num">${maquinas}</div><div>Máquinas distintas</div></div>
+      <div class="informe-stat"><div class="informe-stat-num">${porMaquina.length}</div><div>Máquinas distintas</div></div>
       <div class="informe-stat"><div class="informe-stat-num">${sitios}</div><div>Sitios visitados</div></div>
-      <div class="informe-stat"><div class="informe-stat-num">${novedades}</div><div>Con novedad</div></div>
+      <div class="informe-stat"><div class="informe-stat-num">${operatividadGeneral}%</div><div>Operatividad general</div></div>
       <div class="informe-stat"><div class="informe-stat-num">${alertas}</div><div>Con alertas</div></div>
     </div>
 
-    <h3>Mapa de ubicaciones</h3>
+    <h3>Ubicación y operatividad por máquina</h3>
+    <div class="informe-leyenda">
+      <span><i style="background:#4A9F6E;"></i> ≥90% operativa</span>
+      <span><i style="background:#E3A008;"></i> 70–89% operativa</span>
+      <span><i style="background:#D6533F;"></i> &lt;70% operativa</span>
+    </div>
     <div id="informe-mapa" class="informe-mapa"></div>
 
-    <h3>Detalle de inspecciones (${total})</h3>
+    <h3>Resumen por máquina</h3>
     <table class="informe-tabla">
-      <thead><tr><th>Fecha</th><th>Turno</th><th>Máquina</th><th>Contratista</th><th>Operador</th><th>Estado</th><th>Sitio</th><th>Alertas</th><th>Comentario</th></tr></thead>
-      <tbody>${filas}</tbody>
+      <thead><tr><th>Unidad</th><th>Tipo</th><th>Contratista</th><th>Revisiones</th><th>Novedades</th><th>Alertas</th><th>% Operatividad</th></tr></thead>
+      <tbody>${filasMaquina}</tbody>
     </table>
-  `;
 
-  await dibujarMapaInforme(informeDatos);
+    <h3>Resumen por contratista</h3>
+    <table class="informe-tabla">
+      <thead><tr><th>Contratista</th><th>Máquinas</th><th>Revisiones</th><th>Novedades</th><th>Alertas</th><th>% Operatividad</th></tr></thead>
+      <tbody>${filasContratista}</tbody>
+    </table>
+
+    <h3>Causas de no operatividad reportadas (${registrosNovedad.length})</h3>
+    ${registrosNovedad.length ? `
+    <table class="informe-tabla">
+      <thead><tr><th>Fecha</th><th>Máquina</th><th>Contratista</th><th>Sitio</th><th>Causa reportada</th></tr></thead>
+      <tbody>${filasCausas}</tbody>
+    </table>` : `<p style="color:var(--text-faint);font-size:13px;">Ninguna máquina reportó novedad en este periodo.</p>`}
+
+    <h3>Alertas de verificación (${registrosAlerta.length})</h3>
+    ${registrosAlerta.length ? `
+    <table class="informe-tabla">
+      <thead><tr><th>Fecha</th><th>Máquina</th><th>Contratista</th><th>Tipo de alerta</th></tr></thead>
+      <tbody>${filasAlertas}</tbody>
+    </table>` : `<p style="color:var(--text-faint);font-size:13px;">Ningún registro de este periodo activó una alerta de verificación.</p>`}
+  `;
 }
 
 async function dibujarMapaInforme(registros){
@@ -2634,29 +2752,33 @@ async function dibujarMapaInforme(registros){
   contenedor.innerHTML = "";
   if (!window.L) return;
 
+  const porMaquina = agruparPorMaquina(registros).filter(m => m.ultimaUbicacion);
+
   const map = L.map(contenedor, { attributionControl: false, zoomControl: true });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "© OpenStreetMap"
   }).addTo(map);
 
   const puntos = [];
-  registros.forEach(r => {
-    if (r.ubicacion?.lat != null){
-      const alerta = r.alertaUbicacion || r.alertaReloj;
-      L.circleMarker([r.ubicacion.lat, r.ubicacion.lng], {
-        radius: 6, color: alerta ? "#D6533F" : "#4A9F6E", fillColor: alerta ? "#D6533F" : "#4A9F6E",
-        fillOpacity: 0.85, weight: 2
-      }).addTo(map).bindPopup(
-        `<strong>${r.tipoMaquinaCodigo || r.tipoMaquina}</strong> · Unidad ${r.codigoMaquina}<br>${formatFecha(r.timestampCaptura)}<br>${r.contratista}`
-      );
-      puntos.push([r.ubicacion.lat, r.ubicacion.lng]);
-    }
+  porMaquina.forEach(m => {
+    const color = colorPorOperatividad(m.porcentajeOperativa);
+    L.circleMarker([m.ultimaUbicacion.lat, m.ultimaUbicacion.lng], {
+      radius: 9, color: "#fff", weight: 2, fillColor: color, fillOpacity: 0.95
+    }).addTo(map).bindTooltip(
+      `<div class="informe-tooltip-maquina"><strong>${m.codigoMaquina}</strong><br>${m.porcentajeOperativa}% operativa · ${m.revisiones} rev.</div>`,
+      { permanent: true, direction: "top", offset: [0, -10] }
+    );
+    puntos.push([m.ultimaUbicacion.lat, m.ultimaUbicacion.lng]);
   });
 
   if (puntos.length){
-    map.fitBounds(puntos, { padding: [28,28], maxZoom: 16 });
+    map.fitBounds(puntos, { padding: [36,36], maxZoom: 16 });
+    // Leaflet necesita recalcular tamaño una vez el contenedor ya es visible
+    // y tiene su tamaño final — sin esto el mapa puede salir cortado o gris.
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => { map.invalidateSize(); map.fitBounds(puntos, { padding: [36,36], maxZoom: 16 }); }, 250);
   } else {
-    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Ningún registro de este periodo tiene coordenadas guardadas.</div>`;
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Ninguna máquina de este periodo tiene coordenadas guardadas.</div>`;
     map.remove();
     return;
   }
