@@ -250,6 +250,24 @@
   .estado-choice label:has(input[value="operativa"]:checked){border-color:var(--success);background:var(--success-soft);color:var(--success);}
   .estado-choice label:has(input[value="novedad"]:checked){border-color:var(--danger);background:var(--danger-soft);color:#FF9A85;}
 
+  .maquinas-sugeridas{display:flex;flex-direction:column;gap:8px;}
+  .maquina-sugerida-btn{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;
+    background:var(--bg-input);border:2px solid var(--line);border-radius:var(--radius);padding:13px 14px;
+    cursor:pointer;color:var(--text-primary);
+  }
+  .maquina-sugerida-btn .msb-main{font-weight:600;font-size:14px;}
+  .maquina-sugerida-btn .msb-sub{font-size:12px;color:var(--text-muted);font-family:var(--font-mono);margin-top:2px;}
+  .maquina-sugerida-btn .msb-check{font-size:18px;color:var(--text-faint);flex-shrink:0;}
+  .maquina-sugerida-btn.activa{border-color:var(--accent-amber);background:var(--accent-amber-soft);}
+  .maquina-sugerida-btn.activa .msb-check{color:var(--accent-amber);}
+
+  .maquina-asignada-fila{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-input);
+    border:1px solid var(--line);border-radius:var(--radius);padding:9px 12px;margin-bottom:6px;font-size:13px;
+  }
+  .maquina-asignada-fila .maf-info{font-family:var(--font-mono);font-size:12px;color:var(--text-muted);}
+
   @media(max-width:400px){
     .icon-badge-lg{width:84px;height:84px;}
     .splash-name{font-size:28px;}
@@ -636,6 +654,33 @@
       <div class="ticket">
         <div class="ticket-body">
           <form id="form-captura">
+            <div class="section-title" style="margin-top:0;">Ubicación</div>
+            <div class="field">
+              <div class="gps-box">
+                <div class="gps-readout" id="gps-readout"><span class="muted">Detectando ubicación…</span></div>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-gps">Actualizar ubicación</button>
+              </div>
+              <div id="gps-verificacion" style="margin-top:8px;"></div>
+            </div>
+            <div class="field">
+              <label class="label">Sitio de obra declarado</label>
+              <select id="f-sitio" required>
+                <option value="">Seleccionar sitio…</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label">Referencia / dirección (opcional)</label>
+              <input type="text" id="f-referencia" placeholder="Ej. Av. Bolívar cruce con calle 5, sector El Paraíso">
+            </div>
+
+            <div id="bloque-maquinas-sugeridas" class="hidden">
+              <div class="section-title">Máquina detectada en este sitio</div>
+              <div class="field">
+                <div id="maquinas-sugeridas" class="maquinas-sugeridas"></div>
+                <div class="label" style="margin-top:8px;">Si ninguna es correcta, completa los datos abajo manualmente.</div>
+              </div>
+            </div>
+
             <div class="section-title">Identificación</div>
             <div class="grid-2">
               <div class="field">
@@ -665,25 +710,6 @@
                   <option value="Noche">Noche</option>
                 </select>
               </div>
-            </div>
-
-            <div class="section-title">Ubicación</div>
-            <div class="field">
-              <label class="label">Sitio de obra declarado</label>
-              <select id="f-sitio" required>
-                <option value="">Seleccionar sitio…</option>
-              </select>
-            </div>
-            <div class="field">
-              <div class="gps-box">
-                <div class="gps-readout" id="gps-readout"><span class="muted">Sin capturar aún</span></div>
-                <button type="button" class="btn btn-ghost btn-sm" id="btn-gps">Capturar ubicación GPS</button>
-              </div>
-              <div id="gps-verificacion" style="margin-top:8px;"></div>
-            </div>
-            <div class="field">
-              <label class="label">Referencia / dirección (opcional)</label>
-              <input type="text" id="f-referencia" placeholder="Ej. Av. Bolívar cruce con calle 5, sector El Paraíso">
             </div>
 
             <div class="section-title">Evidencia fotográfica</div>
@@ -844,11 +870,13 @@
     <!-- ---- VIEW: Sitios de obra (admin) ---- -->
     <div class="view hidden" id="view-sitios">
       <h1 class="page-title">Sitios de obra</h1>
-      <p class="page-sub">Registra las coordenadas y el radio permitido de cada sitio. El personal de campo deberá declarar el sitio al capturar un registro, y la app verificará que su GPS coincida.</p>
+      <p class="page-sub">Registra las coordenadas y el radio permitido de cada sitio, y qué máquinas suelen trabajar ahí — así el personal de campo las ve sugeridas automáticamente al llegar al lugar.</p>
 
-      <div class="ticket" style="max-width:520px;">
+      <div class="ticket" style="max-width:560px;">
         <div class="ticket-body">
+          <div id="sitio-form-title" class="section-title" style="margin-top:0;">Nuevo sitio</div>
           <form id="form-sitio">
+            <input type="hidden" id="s-editando-id" value="">
             <div class="field">
               <label class="label">Nombre del sitio / obra</label>
               <input type="text" id="s-nombre" placeholder="Ej. Escombrera Municipal Norte" required>
@@ -870,14 +898,34 @@
               <label class="label">Radio permitido (metros)</label>
               <input type="number" step="1" id="s-radio" value="250" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Agregar sitio</button>
+
+            <div class="section-title">Máquinas asignadas a este sitio</div>
+            <div id="lista-maquinas-asignadas" style="margin-bottom:12px;"></div>
+            <div class="grid-2">
+              <div class="field">
+                <label class="label">Tipo de maquinaria</label>
+                <select id="sm-tipo"><option value="">Seleccionar…</option></select>
+              </div>
+              <div class="field">
+                <label class="label">Placa / unidad</label>
+                <input type="text" id="sm-codigo" placeholder="Ej. EXC-014">
+              </div>
+              <div class="field" style="grid-column:1/-1;">
+                <label class="label">Contratista</label>
+                <input type="text" id="sm-contratista" placeholder="Empresa contratista">
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm btn-block" id="btn-agregar-maquina-sitio" style="margin-bottom:16px;">+ Agregar máquina a la lista</button>
+
+            <button type="submit" class="btn btn-primary btn-block" id="btn-guardar-sitio">Agregar sitio</button>
+            <button type="button" class="btn btn-ghost btn-block hidden" id="btn-cancelar-edicion-sitio" style="margin-top:8px;">Cancelar edición</button>
           </form>
         </div>
       </div>
 
       <div class="table-wrap" style="margin-top:18px;">
         <table>
-          <thead><tr><th>Sitio</th><th>Coordenadas</th><th>Radio</th><th></th></tr></thead>
+          <thead><tr><th>Sitio</th><th>Coordenadas</th><th>Radio</th><th>Máquinas</th><th></th></tr></thead>
           <tbody id="tbody-sitios"></tbody>
         </table>
       </div>
@@ -1386,24 +1434,74 @@ function goToView(name){
   $all(".nav-item").forEach(n => n.classList.remove("active"));
   $(`#view-${name}`).classList.remove("hidden");
   $(`#nav-${name}`)?.classList.add("active");
+  // Solo auto-detectamos si el formulario está vacío, para no pisar datos
+  // que el inspector ya haya empezado a llenar si vuelve a esta pestaña.
+  if (name === "captura" && !$("#f-tipo").value && !$("#f-codigo").value){
+    detectarUbicacionYMaquinas(false);
+  }
 }
 $all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
 
 /* =========================================================================
-   CAPTURA GPS
+   DETECCIÓN AUTOMÁTICA DE UBICACIÓN, SITIO Y MÁQUINAS SUGERIDAS
    ========================================================================= */
-$("#btn-gps").onclick = async () => {
-  if (!$("#f-sitio").value){ showToast("Primero selecciona el sitio de obra declarado.", "error"); return; }
-  $("#gps-readout").innerHTML = `<span class="muted">Obteniendo ubicación (GPS en vivo, sin caché)…</span>`;
+async function detectarUbicacionYMaquinas(mostrarErrorSiFalla){
+  $("#gps-readout").innerHTML = `<span class="muted">Detectando ubicación (GPS en vivo, sin caché)…</span>`;
   $("#gps-verificacion").innerHTML = "";
   try{
-    capturaGPS = await obtenerGPSFresco();
+    capturaGPS = await obtenerGPSFresco(10000);
     $("#gps-readout").innerHTML = `${capturaGPS.lat.toFixed(6)}, ${capturaGPS.lng.toFixed(6)} <span class="muted">±${Math.round(capturaGPS.precision)}m</span>`;
+
+    // Buscamos el sitio registrado más cercano, siempre que esté dentro de
+    // su propio radio permitido — así no sugerimos un sitio al que en
+    // realidad no hemos llegado todavía.
+    let mejor = null, mejorDistancia = Infinity;
+    cacheSitios.forEach(s => {
+      const d = distanciaMetros(capturaGPS.lat, capturaGPS.lng, s.lat, s.lng);
+      if (d <= s.radio && d < mejorDistancia){ mejor = s; mejorDistancia = d; }
+    });
+    if (mejor) $("#f-sitio").value = mejor.id;
     verificarContraSitio();
+    mostrarMaquinasSugeridas(mejor);
   } catch(err){
     $("#gps-readout").innerHTML = `<span class="muted">No se pudo obtener ubicación (${err.message})</span>`;
+    if (mostrarErrorSiFalla) showToast("No se pudo detectar tu ubicación. Puedes elegir el sitio y la máquina manualmente.", "error");
   }
-};
+}
+
+function mostrarMaquinasSugeridas(sitio){
+  const bloque = $("#bloque-maquinas-sugeridas");
+  const cont = $("#maquinas-sugeridas");
+  const lista = sitio?.maquinasAsignadas || [];
+  if (!sitio || lista.length === 0){
+    bloque.classList.add("hidden");
+    cont.innerHTML = "";
+    return;
+  }
+  bloque.classList.remove("hidden");
+  cont.innerHTML = lista.map((m, i) => {
+    const cat = buscarMaquina(m.tipoMaquinaCodigo);
+    return `
+    <div class="maquina-sugerida-btn" data-msb="${i}">
+      <div>
+        <div class="msb-main">${cat ? cat.nombre : m.tipoMaquinaCodigo}</div>
+        <div class="msb-sub">${m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}${m.contratista ? ' · ' + m.contratista : ''}</div>
+      </div>
+      <span class="msb-check">○</span>
+    </div>`;
+  }).join("");
+  $all("[data-msb]").forEach(btn => btn.onclick = () => {
+    const m = lista[parseInt(btn.dataset.msb)];
+    $("#f-tipo").value = m.tipoMaquinaCodigo;
+    $("#f-codigo").value = m.codigoMaquina;
+    if (m.contratista) $("#f-contratista").value = m.contratista;
+    $all(".maquina-sugerida-btn").forEach(b => { b.classList.remove("activa"); b.querySelector(".msb-check").textContent = "○"; });
+    btn.classList.add("activa");
+    btn.querySelector(".msb-check").textContent = "●";
+  });
+}
+
+$("#btn-gps").onclick = () => detectarUbicacionYMaquinas(true);
 
 function verificarContraSitio(){
   const sitioId = $("#f-sitio").value;
@@ -1417,7 +1515,10 @@ function verificarContraSitio(){
     box.innerHTML = `<div class="verif-box verif-alert">⚠ A ${Math.round(distancia)} m de "${sitio.nombre}" — fuera del radio permitido de ${sitio.radio} m. El registro se guardará marcado para revisión.</div>`;
   }
 }
-$("#f-sitio").addEventListener("change", verificarContraSitio);
+$("#f-sitio").addEventListener("change", () => {
+  verificarContraSitio();
+  mostrarMaquinasSugeridas(cacheSitios.find(s => s.id === $("#f-sitio").value));
+});
 
 /* =========================================================================
    CAPTURA DE FOTOS
@@ -1679,9 +1780,9 @@ $("#form-captura").addEventListener("submit", async (e) => {
       marcarSlotVacio(slot);
     });
     capturaGPS = null;
-    $("#gps-readout").innerHTML = `<span class="muted">Sin capturar aún</span>`;
-    $("#gps-verificacion").innerHTML = "";
+    mostrarMaquinasSugeridas(null);
     refreshSyncPill();
+    detectarUbicacionYMaquinas(false); // listo para el siguiente registro en el mismo sitio
   } catch(err){
     console.error(err);
     showToast("No se pudo guardar el registro: " + err.message, "error");
@@ -2194,19 +2295,28 @@ async function cargarSitios(){
 function renderTablaSitios(){
   const tbody = $("#tbody-sitios");
   if (!tbody) return;
-  tbody.innerHTML = cacheSitios.map(s => `
+  tbody.innerHTML = cacheSitios.map(s => {
+    const nMaquinas = (s.maquinasAsignadas || []).length;
+    return `
     <tr>
       <td>${s.nombre}</td>
       <td style="font-family:var(--font-mono);font-size:12px;">${s.lat.toFixed(6)}, ${s.lng.toFixed(6)}</td>
       <td>${s.radio} m</td>
-      <td><button class="btn btn-ghost btn-sm" data-del-sitio="${s.id}">Eliminar</button></td>
-    </tr>`).join("") || `<tr><td colspan="4" style="color:var(--text-faint);padding:16px;">Aún no hay sitios registrados.</td></tr>`;
+      <td>${nMaquinas > 0 ? `${nMaquinas} asignada${nMaquinas>1?'s':''}` : '<span style="color:var(--text-faint);">Ninguna</span>'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" data-editar-sitio="${s.id}">Editar</button>
+        <button class="btn btn-ghost btn-sm" data-del-sitio="${s.id}">Eliminar</button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">Aún no hay sitios registrados.</td></tr>`;
+
   $all("[data-del-sitio]").forEach(btn => btn.onclick = async () => {
     if (!confirm("¿Eliminar este sitio? Los registros ya guardados no se verán afectados.")) return;
     await db.collection(col("sitios")).doc(btn.dataset.delSitio).delete();
     cargarSitios();
     showToast("Sitio eliminado.", "success");
   });
+  $all("[data-editar-sitio]").forEach(btn => btn.onclick = () => cargarSitioParaEditar(btn.dataset.editarSitio));
 }
 
 $("#btn-sitio-gps").onclick = async () => {
@@ -2223,21 +2333,102 @@ $("#btn-sitio-gps").onclick = async () => {
   }
 };
 
+/* ---------- Máquinas asignadas a un sitio (mientras se arma el formulario) ---------- */
+let maquinasAsignadasTemp = [];
+
+function poblarSelectMaquinariaSitio(){
+  const sel = $("#sm-tipo");
+  sel.innerHTML = `<option value="">Seleccionar…</option>` +
+    CATALOGO_MAQUINARIA.map(m => `<option value="${m.codigo}">${m.codigo} — ${m.nombre}</option>`).join("");
+}
+poblarSelectMaquinariaSitio();
+
+function renderListaMaquinasAsignadas(){
+  const cont = $("#lista-maquinas-asignadas");
+  if (maquinasAsignadasTemp.length === 0){
+    cont.innerHTML = `<div style="color:var(--text-faint);font-size:12.5px;">Ninguna máquina asignada todavía.</div>`;
+    return;
+  }
+  cont.innerHTML = maquinasAsignadasTemp.map((m, i) => `
+    <div class="maquina-asignada-fila">
+      <div>
+        <div>${m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</div>
+        <div class="maf-info">${m.contratista || 'Sin contratista especificado'}</div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" data-quitar-maquina="${i}">✕</button>
+    </div>`).join("");
+  $all("[data-quitar-maquina]").forEach(btn => btn.onclick = () => {
+    maquinasAsignadasTemp.splice(parseInt(btn.dataset.quitarMaquina), 1);
+    renderListaMaquinasAsignadas();
+  });
+}
+renderListaMaquinasAsignadas();
+
+$("#btn-agregar-maquina-sitio").onclick = () => {
+  const tipo = $("#sm-tipo").value;
+  const codigo = $("#sm-codigo").value.trim();
+  const contratista = $("#sm-contratista").value.trim();
+  if (!tipo || !codigo){
+    showToast("Elige el tipo de máquina y su placa/unidad antes de agregarla.", "error");
+    return;
+  }
+  maquinasAsignadasTemp.push({ tipoMaquinaCodigo: tipo, codigoMaquina: codigo, contratista });
+  $("#sm-tipo").value = ""; $("#sm-codigo").value = ""; $("#sm-contratista").value = "";
+  renderListaMaquinasAsignadas();
+};
+
+function cargarSitioParaEditar(id){
+  const sitio = cacheSitios.find(s => s.id === id);
+  if (!sitio) return;
+  $("#s-editando-id").value = sitio.id;
+  $("#s-nombre").value = sitio.nombre;
+  $("#s-lat").value = sitio.lat;
+  $("#s-lng").value = sitio.lng;
+  $("#s-radio").value = sitio.radio;
+  maquinasAsignadasTemp = JSON.parse(JSON.stringify(sitio.maquinasAsignadas || []));
+  renderListaMaquinasAsignadas();
+  $("#sitio-form-title").textContent = `Editando: ${sitio.nombre}`;
+  $("#btn-guardar-sitio").textContent = "Guardar cambios";
+  $("#btn-cancelar-edicion-sitio").classList.remove("hidden");
+  $("#form-sitio").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelarEdicionSitio(){
+  $("#form-sitio").reset();
+  $("#s-editando-id").value = "";
+  $("#s-radio").value = 250;
+  maquinasAsignadasTemp = [];
+  renderListaMaquinasAsignadas();
+  $("#sitio-form-title").textContent = "Nuevo sitio";
+  $("#btn-guardar-sitio").textContent = "Agregar sitio";
+  $("#btn-cancelar-edicion-sitio").classList.add("hidden");
+}
+$("#btn-cancelar-edicion-sitio").onclick = cancelarEdicionSitio;
+
 $("#form-sitio").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const idEditando = $("#s-editando-id").value;
+  const datos = {
+    nombre: $("#s-nombre").value.trim(),
+    lat: parseFloat($("#s-lat").value),
+    lng: parseFloat($("#s-lng").value),
+    radio: parseFloat($("#s-radio").value) || 250,
+    maquinasAsignadas: maquinasAsignadasTemp
+  };
   try{
-    await db.collection(col("sitios")).add({
-      nombre: $("#s-nombre").value.trim(),
-      lat: parseFloat($("#s-lat").value),
-      lng: parseFloat($("#s-lng").value),
-      radio: parseFloat($("#s-radio").value) || 250,
-      creadoPor: currentUser.uid,
-      creadoEn: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    $("#form-sitio").reset();
-    $("#s-radio").value = 250;
+    if (idEditando){
+      await db.collection(col("sitios")).doc(idEditando).update(datos);
+      showToast("Sitio actualizado.", "success");
+    } else {
+      await db.collection(col("sitios")).add({
+        ...datos,
+        creadoPor: currentUser.uid,
+        creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast("Sitio agregado.", "success");
+    }
+    cancelarEdicionSitio();
     cargarSitios();
-    showToast("Sitio agregado.", "success");
   } catch(err){
     showToast("No se pudo guardar el sitio: " + err.message, "error");
   }
