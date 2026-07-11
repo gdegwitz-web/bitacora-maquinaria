@@ -337,6 +337,11 @@
   }
   .sac-maquina .sac-tipo{color:var(--text-faint);font-family:var(--font-mono);font-size:11px;}
 
+  .sitio-inspector-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;background:var(--bg-input);}
+  .sitio-inspector-card.activo{border-color:var(--accent-amber);background:var(--accent-amber-soft);}
+  .sitio-inspector-card .checklist-item{border:none;padding:0;margin-bottom:0;background:transparent;}
+  .sitio-inspector-card .checklist-item:has(input:checked){background:transparent;}
+
   @media(max-width:400px){
     .icon-badge-lg{width:84px;height:84px;}
     .splash-name{font-size:28px;}
@@ -1022,10 +1027,10 @@
     <!-- ---- VIEW: Inspectores (admin) ---- -->
     <div class="view hidden" id="view-inspectores">
       <h1 class="page-title">Inspectores</h1>
-      <p class="page-sub">Asigna a cada persona de campo los sitios que debe visitar. Las máquinas se calculan solas, según lo que ya tenga asignado cada sitio.</p>
+      <p class="page-sub">Toca un inspector para asignarle sitios — las máquinas de cada sitio aparecen junto a él, no mezcladas con las de otros.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Inspector</th><th>Correo</th><th>Sitios asignados</th><th>Máquinas que verá</th><th></th></tr></thead>
+          <thead><tr><th>Inspector</th><th>Sitios</th><th>Máquinas</th></tr></thead>
           <tbody id="tbody-inspectores"></tbody>
         </table>
       </div>
@@ -2800,15 +2805,16 @@ function renderTablaInspectores(){
     const sitios = sitiosVisiblesPara(u.id);
     const maquinas = maquinasVisiblesPara(u.id);
     return `
-    <tr>
-      <td>${u.nombre || '—'}</td>
-      <td>${u.email}</td>
+    <tr data-gestionar-inspector="${u.id}" style="cursor:pointer;">
+      <td>
+        <div style="font-weight:600;">${u.nombre || '—'}</div>
+        <div style="color:var(--text-faint);font-size:11.5px;">${u.email}</div>
+      </td>
       <td>${sitios.length}</td>
       <td>${maquinas.length}</td>
-      <td><button class="btn btn-ghost btn-sm" data-gestionar-inspector="${u.id}">Gestionar asignaciones</button></td>
     </tr>`;
-  }).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">Todavía no hay personal de campo registrado.</td></tr>`;
-  $all("[data-gestionar-inspector]").forEach(btn => btn.onclick = () => abrirGestionInspector(btn.dataset.gestionarInspector));
+  }).join("") || `<tr><td colspan="3" style="color:var(--text-faint);padding:16px;">Todavía no hay personal de campo registrado.</td></tr>`;
+  $all("[data-gestionar-inspector]").forEach(tr => tr.onclick = () => abrirGestionInspector(tr.dataset.gestionarInspector));
 }
 
 function abrirGestionInspector(uid){
@@ -2817,38 +2823,38 @@ function abrirGestionInspector(uid){
   const root = $("#modal-root");
 
   function renderContenidoModal(){
-    const checklistHtml = cacheSitios.map(s => {
+    const filasSitios = cacheSitios.map(s => {
       const asignado = (s.inspectoresAsignados || []).includes(uid);
       const abierto = !(s.inspectoresAsignados || []).length;
-      return `
-      <label class="checklist-item" style="justify-content:space-between;">
-        <span style="display:flex;align-items:center;gap:10px;">
-          <input type="checkbox" data-sitio-toggle="${s.id}" ${asignado ? "checked" : ""}>
-          <span>${s.nombre}</span>
-        </span>
-        ${abierto ? `<span class="badge badge-pending">Abierto a todos</span>` : ''}
-      </label>`;
-    }).join("") || `<div style="color:var(--text-faint);font-size:12.5px;">Todavía no hay sitios registrados.</div>`;
+      const maquinas = s.maquinasAsignadas || [];
+      const maquinasHtml = maquinas.length
+        ? maquinas.map(m => {
+            const cat = buscarMaquina(m.tipoMaquinaCodigo);
+            return `<div class="sac-maquina"><span>${cat ? cat.nombre : m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</span><span class="sac-tipo">${m.contratista || ''}</span></div>`;
+          }).join("")
+        : `<div style="color:var(--text-faint);font-size:11.5px;padding:4px 2px;">Este sitio no tiene máquinas asignadas todavía.</div>`;
 
-    const maquinas = maquinasVisiblesPara(uid);
-    const maquinasHtml = maquinas.length ? maquinas.map(m => {
-      const cat = buscarMaquina(m.tipoMaquinaCodigo);
-      return `<div class="sac-maquina"><span>${cat ? cat.nombre : m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</span><span class="sac-tipo">${m.contratista || ''}</span></div>`;
-    }).join("") : `<div style="color:var(--text-faint);font-size:12.5px;">Ninguna máquina asignada en los sitios visibles para este inspector.</div>`;
+      return `
+      <div class="sitio-inspector-card${asignado ? ' activo' : ''}">
+        <label class="checklist-item" style="justify-content:space-between;margin-bottom:${maquinas.length || !maquinas.length ? '10' : '0'}px;">
+          <span style="display:flex;align-items:center;gap:10px;">
+            <input type="checkbox" data-sitio-toggle="${s.id}" ${asignado ? "checked" : ""}>
+            <span style="font-weight:600;">${s.nombre}</span>
+          </span>
+          ${abierto ? `<span class="badge badge-pending">Abierto a todos</span>` : ''}
+        </label>
+        <div style="padding-left:26px;">${maquinasHtml}</div>
+      </div>`;
+    }).join("") || `<div style="color:var(--text-faint);font-size:12.5px;">Todavía no hay sitios registrados.</div>`;
 
     root.innerHTML = `
       <div class="modal-overlay" id="modal-overlay">
         <div class="modal">
           <button class="modal-close" id="modal-close">✕</button>
           <div class="section-title" style="margin-top:0;">${u.nombre || u.email}</div>
-          <div style="color:var(--text-muted);font-size:12.5px;margin-bottom:16px;">${u.email}</div>
-
-          <div class="section-title">Sitios asignados</div>
-          <div style="max-height:230px;overflow-y:auto;margin-bottom:6px;">${checklistHtml}</div>
-          <div class="label">Si no marcas ningún inspector para un sitio, ese sitio queda visible para todo el personal de campo.</div>
-
-          <div class="section-title">Máquinas que verá (según sus sitios)</div>
-          <div>${maquinasHtml}</div>
+          <div style="color:var(--text-muted);font-size:12.5px;margin-bottom:6px;">${u.email}</div>
+          <div class="label" style="margin-bottom:14px;">Marca los sitios que le corresponden a este inspector — las máquinas de cada uno aparecen justo debajo. Los sitios sin nadie marcado quedan visibles para todo el personal de campo.</div>
+          <div style="max-height:400px;overflow-y:auto;">${filasSitios}</div>
         </div>
       </div>`;
 
