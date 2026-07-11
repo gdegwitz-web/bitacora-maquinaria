@@ -1027,7 +1027,7 @@
     <!-- ---- VIEW: Inspectores (admin) ---- -->
     <div class="view hidden" id="view-inspectores">
       <h1 class="page-title">Inspectores</h1>
-      <p class="page-sub">Toca un inspector para asignarle sitios — las máquinas de cada sitio aparecen junto a él, no mezcladas con las de otros.</p>
+      <p class="page-sub">Toca un inspector para asignarle sitios — las máquinas de cada sitio aparecen junto a él, no mezcladas con las de otros. Los números de la tabla cuentan solo lo que marcaste explícitamente para cada persona (los sitios sin nadie marcado son visibles para todos, pero no cuentan aquí).</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Inspector</th><th>Sitios</th><th>Máquinas</th></tr></thead>
@@ -2782,14 +2782,16 @@ function renderChecklistInspectores(){
    INSPECTORES — asignar sitios (y, por extensión, sus máquinas) a cada
    persona de campo, desde la perspectiva del inspector en vez del sitio.
    ========================================================================= */
-function sitiosVisiblesPara(uid){
-  // Misma regla que usa el propio inspector en "Mis sitios": un sitio sin
-  // lista de asignados se considera abierto a todo el personal de campo.
-  return cacheSitios.filter(s => !s.inspectoresAsignados?.length || s.inspectoresAsignados.includes(uid));
+// A diferencia de las de arriba (que incluyen los sitios "abiertos a todos"
+// sin nadie marcado), estas cuentan SOLO lo que el admin marcó explícitamente
+// para esa persona — es lo que corresponde mostrar en la tabla de
+// Inspectores, para que el número coincida con los checkboxes del panel.
+function sitiosAsignadosExplicitamente(uid){
+  return cacheSitios.filter(s => (s.inspectoresAsignados || []).includes(uid));
 }
-function maquinasVisiblesPara(uid){
+function maquinasDeAsignacionExplicita(uid){
   const vistos = new Set(), lista = [];
-  sitiosVisiblesPara(uid).forEach(s => {
+  sitiosAsignadosExplicitamente(uid).forEach(s => {
     (s.maquinasAsignadas || []).forEach(m => {
       if (!vistos.has(m.codigoMaquina)){ vistos.add(m.codigoMaquina); lista.push(m); }
     });
@@ -2802,8 +2804,8 @@ function renderTablaInspectores(){
   if (!tbody) return;
   const inspectores = cacheUsuarios.filter(u => u.role !== "admin");
   tbody.innerHTML = inspectores.map(u => {
-    const sitios = sitiosVisiblesPara(u.id);
-    const maquinas = maquinasVisiblesPara(u.id);
+    const sitios = sitiosAsignadosExplicitamente(u.id);
+    const maquinas = maquinasDeAsignacionExplicita(u.id);
     return `
     <tr data-gestionar-inspector="${u.id}" style="cursor:pointer;">
       <td>
@@ -2821,6 +2823,7 @@ function abrirGestionInspector(uid){
   const u = cacheUsuarios.find(x => x.id === uid);
   if (!u) return;
   const root = $("#modal-root");
+  let mapaGestionInspector = null;
 
   function renderContenidoModal(){
     const filasSitios = cacheSitios.map(s => {
@@ -2847,6 +2850,8 @@ function abrirGestionInspector(uid){
       </div>`;
     }).join("") || `<div style="color:var(--text-faint);font-size:12.5px;">Todavía no hay sitios registrados.</div>`;
 
+    const asignados = sitiosAsignadosExplicitamente(uid);
+
     root.innerHTML = `
       <div class="modal-overlay" id="modal-overlay">
         <div class="modal">
@@ -2854,12 +2859,18 @@ function abrirGestionInspector(uid){
           <div class="section-title" style="margin-top:0;">${u.nombre || u.email}</div>
           <div style="color:var(--text-muted);font-size:12.5px;margin-bottom:6px;">${u.email}</div>
           <div class="label" style="margin-bottom:14px;">Marca los sitios que le corresponden a este inspector — las máquinas de cada uno aparecen justo debajo. Los sitios sin nadie marcado quedan visibles para todo el personal de campo.</div>
-          <div style="max-height:400px;overflow-y:auto;">${filasSitios}</div>
+          <div style="max-height:340px;overflow-y:auto;">${filasSitios}</div>
+
+          <div class="section-title">Mapa de sitios asignados</div>
+          ${asignados.length
+            ? `<div id="mapa-gestion-inspector" class="informe-mapa" style="height:240px;"></div>`
+            : `<div style="color:var(--text-faint);font-size:12.5px;background:var(--bg-input);border:1px solid var(--line);border-radius:8px;padding:14px;">Marca al menos un sitio arriba para verlo en el mapa.</div>`
+          }
         </div>
       </div>`;
 
-    $("#modal-close").onclick = () => root.innerHTML = "";
-    $("#modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") root.innerHTML = ""; };
+    $("#modal-close").onclick = () => { if (mapaGestionInspector) mapaGestionInspector.remove(); root.innerHTML = ""; };
+    $("#modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") { if (mapaGestionInspector) mapaGestionInspector.remove(); root.innerHTML = ""; } };
     $all("[data-sitio-toggle]").forEach(chk => chk.onchange = async () => {
       const sitioId = chk.dataset.sitioToggle;
       const sitio = cacheSitios.find(s => s.id === sitioId);
@@ -2879,6 +2890,42 @@ function abrirGestionInspector(uid){
       renderContenidoModal();
       renderTablaInspectores();
     });
+
+    if (asignados.length) dibujarMapaGestionInspector(asignados);
+  }
+
+  async function dibujarMapaGestionInspector(sitiosAsignados){
+    const contenedor = document.getElementById("mapa-gestion-inspector");
+    if (!contenedor) return;
+    try{
+      contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Cargando mapa…</div>`;
+      await cargarLeafletSiHaceFalta();
+    } catch(err){
+      contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;text-align:center;padding:12px;">No se pudo cargar el mapa (necesita conexión la primera vez).</div>`;
+      return;
+    }
+    contenedor.innerHTML = "";
+    if (!window.L || !document.getElementById("mapa-gestion-inspector")) return;
+
+    const map = L.map(contenedor, { attributionControl: false, zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "© OpenStreetMap"
+    }).addTo(map);
+
+    const puntos = [];
+    sitiosAsignados.forEach(s => {
+      const nMaquinas = (s.maquinasAsignadas || []).length;
+      L.circle([s.lat, s.lng], { radius: s.radio, color: "#E3A008", fillColor: "#E3A008", fillOpacity: 0.1, weight: 2 }).addTo(map);
+      L.circleMarker([s.lat, s.lng], { radius: 8, color: "#fff", weight: 2, fillColor: "#E3A008", fillOpacity: 0.95 })
+        .addTo(map)
+        .bindTooltip(`<strong>${s.nombre}</strong><br>${nMaquinas} máquina${nMaquinas === 1 ? '' : 's'} asignada${nMaquinas === 1 ? '' : 's'}`, { permanent: true, direction: "top", offset: [0,-8] });
+      puntos.push([s.lat, s.lng]);
+    });
+
+    map.fitBounds(puntos, { padding: [30,30], maxZoom: 16 });
+    requestAnimationFrame(() => map.invalidateSize());
+    setTimeout(() => { map.invalidateSize(); map.fitBounds(puntos, { padding: [30,30], maxZoom: 16 }); }, 250);
+    mapaGestionInspector = map;
   }
   renderContenidoModal();
 }
