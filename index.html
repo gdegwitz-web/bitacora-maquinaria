@@ -22,9 +22,50 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
-  // Registrado aparte (no dentro del módulo principal): si el módulo falla
-  // por falta de señal, esto igual se ejecuta y deja la app lista para
-  // funcionar sin conexión la próxima vez.
+  // Debe coincidir exactamente con CACHE_NAME en sw.js.
+  const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
+  const URLS_CRITICAS = [
+    "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
+    "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js",
+    "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js",
+    "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js",
+  ];
+
+  // Autorreparación: si alguna vez el guardado inicial (install del service
+  // worker) falló para alguno de estos archivos —por ejemplo, porque esa
+  // actualización se instaló justo cuando el dispositivo no tenía señal
+  // buena—, esto lo corrige solo la próxima vez que SÍ haya conexión, sin
+  // depender de que la persona borre datos manualmente. Se ejecuta aparte
+  // del módulo principal, así que corre incluso si Firebase todavía no
+  // logra cargar en este intento.
+  async function asegurarCacheCritica(){
+    if (!("caches" in window) || navigator.onLine === false) return;
+    try{
+      const cache = await caches.open(NOMBRE_CACHE_ACTUAL);
+      await Promise.all(URLS_CRITICAS.map(async (url) => {
+        try{
+          const yaEsta = await cache.match(url);
+          if (!yaEsta) await cache.add(url);
+        } catch(e){ /* seguimos con las demás, sin bloquear nada */ }
+      }));
+    } catch(e){ /* nunca debe romper la carga de la app */ }
+  }
+  asegurarCacheCritica();
+  window.addEventListener("online", asegurarCacheCritica);
+
+  // Botón de emergencia: borra el service worker y toda la caché de este
+  // sitio desde la propia app, sin depender de que la persona encuentre la
+  // opción en los ajustes del navegador.
+  async function reiniciarAppPorCompleto(){
+    try{
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+      const nombres = await caches.keys();
+      await Promise.all(nombres.map((n) => caches.delete(n)));
+    } catch(e){ /* seguimos igual con la recarga */ }
+    location.reload();
+  }
+
   if ("serviceWorker" in navigator) {
     // Cuando actualizamos sw.js, el navegador necesita un ciclo de "cargar
     // página → notar la versión nueva → activarla" antes de que esa versión
@@ -67,11 +108,19 @@
 
     let regs = [];
     try { regs = await navigator.serviceWorker.getRegistrations(); } catch(e){}
+    let firebaseGuardado = "no se pudo verificar";
+    try{
+      const cache = await caches.open(NOMBRE_CACHE_ACTUAL);
+      const resultados = await Promise.all(URLS_CRITICAS.map((u) => cache.match(u)));
+      const guardados = resultados.filter(Boolean).length;
+      firebaseGuardado = `${guardados}/${URLS_CRITICAS.length}`;
+    } catch(e){}
     const diagnostico = [
       `Conexión del navegador: ${navigator.onLine ? "en línea" : "sin conexión"}`,
       `Service worker: ${window.__bitacoraSWEstado}`,
       `Service workers registrados: ${regs.length}`,
-      `Controlando esta pestaña: ${navigator.serviceWorker.controller ? "sí" : "no"}`
+      `Controlando esta pestaña: ${navigator.serviceWorker.controller ? "sí" : "no"}`,
+      `SDK de Firebase guardado: ${firebaseGuardado}`,
     ].join(" · ");
 
     splash.innerHTML = `
@@ -82,8 +131,10 @@
       </div>
       <button id="btn-reintentar-splash" style="margin-top:24px;padding:12px 22px;border-radius:6px;border:none;background:#E3A008;color:#1B1400;font-weight:600;font-family:inherit;font-size:14px;cursor:pointer;">Reintentar</button>
       <div style="margin-top:26px;color:#5D6A75;font-size:9.5px;max-width:300px;font-family:'IBM Plex Mono',monospace;line-height:1.6;">${diagnostico}</div>
+      <button id="btn-reiniciar-todo" style="margin-top:18px;padding:8px 14px;border-radius:6px;border:1px solid #3A424B;background:transparent;color:#93A0AC;font-family:inherit;font-size:11.5px;cursor:pointer;">Borrar datos guardados y reintentar (necesita señal)</button>
     `;
     document.getElementById("btn-reintentar-splash").onclick = () => location.reload();
+    document.getElementById("btn-reiniciar-todo").onclick = () => reiniciarAppPorCompleto();
   }, 6000);
 </script>
 <style>
@@ -972,7 +1023,7 @@
       <h1 class="page-title">Sitios de obra</h1>
       <p class="page-sub">Registra las coordenadas y el radio permitido de cada sitio, y qué máquinas suelen trabajar ahí — así el personal de campo las ve sugeridas automáticamente al llegar al lugar.</p>
 
-      <div class="ticket" style="max-width:560px;">
+      <div class="ticket" style="max-width:640px;">
         <div class="ticket-body">
           <div id="sitio-form-title" class="section-title" style="margin-top:0;">Nuevo sitio</div>
           <form id="form-sitio">
@@ -980,6 +1031,11 @@
             <div class="field">
               <label class="label">Nombre del sitio / obra</label>
               <input type="text" id="s-nombre" placeholder="Ej. Escombrera Municipal Norte" required>
+            </div>
+
+            <div class="field">
+              <label class="label">Ubicación — toca el mapa para colocar el pin, o usa tu ubicación actual si estás en el sitio</label>
+              <div id="mapa-sitio-form" style="height:260px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--bg-input);"></div>
             </div>
             <div class="grid-2">
               <div class="field">
@@ -1582,6 +1638,7 @@ function goToView(name){
     detectarUbicacionYMaquinas(false);
   }
   if (name === "mis-sitios") renderMisSitios();
+  if (name === "sitios") inicializarMapaSitioForm();
 }
 $all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
 
@@ -2558,6 +2615,77 @@ function renderTablaSitios(){
   $all("[data-editar-sitio]").forEach(btn => btn.onclick = () => cargarSitioParaEditar(btn.dataset.editarSitio));
 }
 
+/* ---------- Mapa interactivo para ubicar el sitio con un pin ---------- */
+let mapaSitioFormActual = null;
+let marcadorSitioForm = null;
+let circuloSitioForm = null;
+const CENTRO_POR_DEFECTO = [10.4806, -66.9036]; // Caracas — punto de partida razonable
+
+function moverPinSitioForm(lat, lng, actualizarInputs){
+  if (actualizarInputs){
+    $("#s-lat").value = lat.toFixed(6);
+    $("#s-lng").value = lng.toFixed(6);
+  }
+  if (marcadorSitioForm) marcadorSitioForm.setLatLng([lat, lng]);
+  if (circuloSitioForm) circuloSitioForm.setLatLng([lat, lng]);
+}
+
+async function inicializarMapaSitioForm(){
+  const contenedor = document.getElementById("mapa-sitio-form");
+  if (!contenedor) return;
+  if (mapaSitioFormActual){ mapaSitioFormActual.remove(); mapaSitioFormActual = null; }
+
+  try{
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;">Cargando mapa…</div>`;
+    await cargarLeafletSiHaceFalta();
+  } catch(err){
+    contenedor.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-faint);font-size:12.5px;text-align:center;padding:12px;">No se pudo cargar el mapa (necesita conexión la primera vez). Puedes escribir las coordenadas manualmente abajo.</div>`;
+    return;
+  }
+  contenedor.innerHTML = "";
+  if (!window.L) return;
+
+  const latActual = parseFloat($("#s-lat").value);
+  const lngActual = parseFloat($("#s-lng").value);
+  const centro = (!isNaN(latActual) && !isNaN(lngActual)) ? [latActual, lngActual] : CENTRO_POR_DEFECTO;
+  const zoomInicial = (!isNaN(latActual) && !isNaN(lngActual)) ? 16 : 12;
+
+  const map = L.map(contenedor, { attributionControl: false, zoomControl: true }).setView(centro, zoomInicial);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  const radio = parseFloat($("#s-radio").value) || 250;
+  circuloSitioForm = L.circle(centro, { radius: radio, color: "#E3A008", fillColor: "#E3A008", fillOpacity: 0.12, weight: 2 }).addTo(map);
+  marcadorSitioForm = L.marker(centro, { draggable: true }).addTo(map);
+
+  marcadorSitioForm.on("dragend", () => {
+    const pos = marcadorSitioForm.getLatLng();
+    moverPinSitioForm(pos.lat, pos.lng, true);
+  });
+  map.on("click", (e) => {
+    moverPinSitioForm(e.latlng.lat, e.latlng.lng, true);
+  });
+
+  requestAnimationFrame(() => map.invalidateSize());
+  setTimeout(() => map.invalidateSize(), 250);
+  mapaSitioFormActual = map;
+}
+
+// Si se escriben las coordenadas o el radio a mano, el mapa se actualiza para reflejarlo.
+$("#s-lat").addEventListener("change", () => {
+  const lat = parseFloat($("#s-lat").value), lng = parseFloat($("#s-lng").value);
+  if (!isNaN(lat) && !isNaN(lng) && mapaSitioFormActual){ moverPinSitioForm(lat, lng, false); mapaSitioFormActual.setView([lat, lng]); }
+});
+$("#s-lng").addEventListener("change", () => {
+  const lat = parseFloat($("#s-lat").value), lng = parseFloat($("#s-lng").value);
+  if (!isNaN(lat) && !isNaN(lng) && mapaSitioFormActual){ moverPinSitioForm(lat, lng, false); mapaSitioFormActual.setView([lat, lng]); }
+});
+$("#s-radio").addEventListener("input", () => {
+  const radio = parseFloat($("#s-radio").value) || 250;
+  if (circuloSitioForm) circuloSitioForm.setRadius(radio);
+});
+
 $("#btn-sitio-gps").onclick = async () => {
   const btn = $("#btn-sitio-gps");
   btn.disabled = true; btn.textContent = "Obteniendo ubicación…";
@@ -2565,6 +2693,8 @@ $("#btn-sitio-gps").onclick = async () => {
     const gps = await obtenerGPSFresco();
     $("#s-lat").value = gps.lat.toFixed(6);
     $("#s-lng").value = gps.lng.toFixed(6);
+    moverPinSitioForm(gps.lat, gps.lng, false);
+    if (mapaSitioFormActual) mapaSitioFormActual.setView([gps.lat, gps.lng], 16);
   } catch(err){
     showToast("No se pudo obtener la ubicación: " + err.message, "error");
   } finally {
@@ -2651,6 +2781,7 @@ function cargarSitioParaEditar(id){
   inspectoresAsignadosTemp = [...(sitio.inspectoresAsignados || [])];
   renderListaMaquinasAsignadas();
   renderChecklistInspectores();
+  inicializarMapaSitioForm();
   $("#sitio-form-title").textContent = `Editando: ${sitio.nombre}`;
   $("#btn-guardar-sitio").textContent = "Guardar cambios";
   $("#btn-cancelar-edicion-sitio").classList.remove("hidden");
@@ -2665,6 +2796,7 @@ function cancelarEdicionSitio(){
   inspectoresAsignadosTemp = [];
   renderListaMaquinasAsignadas();
   renderChecklistInspectores();
+  inicializarMapaSitioForm();
   $("#sitio-form-title").textContent = "Nuevo sitio";
   $("#btn-guardar-sitio").textContent = "Agregar sitio";
   $("#btn-cancelar-edicion-sitio").classList.add("hidden");
