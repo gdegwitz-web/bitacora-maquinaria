@@ -773,6 +773,7 @@
         <div class="nav-item hidden" data-view="mis-sitios" id="nav-mis-sitios"><span class="nav-icon">⌖</span> Mis sitios</div>
         <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
         <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
+        <div class="nav-item hidden" data-view="inspectores" id="nav-inspectores"><span class="nav-icon">⛏</span> Inspectores</div>
         <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
         <div class="nav-item hidden" data-view="informe" id="nav-informe"><span class="nav-icon">▦</span> Informe</div>
       </div>
@@ -1014,6 +1015,18 @@
         <table>
           <thead><tr><th>Correo pre-autorizado</th><th>Estado</th><th></th></tr></thead>
           <tbody id="tbody-preautorizados"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Inspectores (admin) ---- -->
+    <div class="view hidden" id="view-inspectores">
+      <h1 class="page-title">Inspectores</h1>
+      <p class="page-sub">Asigna a cada persona de campo los sitios que debe visitar. Las máquinas se calculan solas, según lo que ya tenga asignado cada sitio.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Inspector</th><th>Correo</th><th>Sitios asignados</th><th>Máquinas que verá</th><th></th></tr></thead>
+          <tbody id="tbody-inspectores"></tbody>
         </table>
       </div>
     </div>
@@ -1603,6 +1616,7 @@ auth.onAuthStateChanged(async (user) => {
     if (currentRole === "admin"){
       $("#nav-panel").classList.remove("hidden");
       $("#nav-usuarios").classList.remove("hidden");
+      $("#nav-inspectores").classList.remove("hidden");
       $("#nav-sitios").classList.remove("hidden");
       $("#nav-informe").classList.remove("hidden");
       cargarPanelAdmin();
@@ -1639,6 +1653,7 @@ function goToView(name){
   }
   if (name === "mis-sitios") renderMisSitios();
   if (name === "sitios") inicializarMapaSitioForm();
+  if (name === "inspectores") renderTablaInspectores();
 }
 $all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
 
@@ -2448,6 +2463,7 @@ async function cargarUsuarios(){
   });
   cargarPreautorizados(emailsRegistrados);
   renderChecklistInspectores();
+  if (!$("#view-inspectores").classList.contains("hidden")) renderTablaInspectores();
 }
 
 async function cargarPreautorizados(emailsRegistrados){
@@ -2509,6 +2525,7 @@ async function cargarSitios(){
   selectCampo.value = valorActual;
 
   if (currentRole === "admin") renderTablaSitios();
+  if (currentRole === "admin" && !$("#view-inspectores").classList.contains("hidden")) renderTablaInspectores();
   if (currentRole !== "admin" && !$("#view-mis-sitios").classList.contains("hidden")) renderMisSitios();
 }
 
@@ -2754,6 +2771,110 @@ function renderChecklistInspectores(){
       inspectoresAsignadosTemp = inspectoresAsignadosTemp.filter(id => id !== chk.value);
     }
   });
+}
+
+/* =========================================================================
+   INSPECTORES — asignar sitios (y, por extensión, sus máquinas) a cada
+   persona de campo, desde la perspectiva del inspector en vez del sitio.
+   ========================================================================= */
+function sitiosVisiblesPara(uid){
+  // Misma regla que usa el propio inspector en "Mis sitios": un sitio sin
+  // lista de asignados se considera abierto a todo el personal de campo.
+  return cacheSitios.filter(s => !s.inspectoresAsignados?.length || s.inspectoresAsignados.includes(uid));
+}
+function maquinasVisiblesPara(uid){
+  const vistos = new Set(), lista = [];
+  sitiosVisiblesPara(uid).forEach(s => {
+    (s.maquinasAsignadas || []).forEach(m => {
+      if (!vistos.has(m.codigoMaquina)){ vistos.add(m.codigoMaquina); lista.push(m); }
+    });
+  });
+  return lista;
+}
+
+function renderTablaInspectores(){
+  const tbody = $("#tbody-inspectores");
+  if (!tbody) return;
+  const inspectores = cacheUsuarios.filter(u => u.role !== "admin");
+  tbody.innerHTML = inspectores.map(u => {
+    const sitios = sitiosVisiblesPara(u.id);
+    const maquinas = maquinasVisiblesPara(u.id);
+    return `
+    <tr>
+      <td>${u.nombre || '—'}</td>
+      <td>${u.email}</td>
+      <td>${sitios.length}</td>
+      <td>${maquinas.length}</td>
+      <td><button class="btn btn-ghost btn-sm" data-gestionar-inspector="${u.id}">Gestionar asignaciones</button></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">Todavía no hay personal de campo registrado.</td></tr>`;
+  $all("[data-gestionar-inspector]").forEach(btn => btn.onclick = () => abrirGestionInspector(btn.dataset.gestionarInspector));
+}
+
+function abrirGestionInspector(uid){
+  const u = cacheUsuarios.find(x => x.id === uid);
+  if (!u) return;
+  const root = $("#modal-root");
+
+  function renderContenidoModal(){
+    const checklistHtml = cacheSitios.map(s => {
+      const asignado = (s.inspectoresAsignados || []).includes(uid);
+      const abierto = !(s.inspectoresAsignados || []).length;
+      return `
+      <label class="checklist-item" style="justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:10px;">
+          <input type="checkbox" data-sitio-toggle="${s.id}" ${asignado ? "checked" : ""}>
+          <span>${s.nombre}</span>
+        </span>
+        ${abierto ? `<span class="badge badge-pending">Abierto a todos</span>` : ''}
+      </label>`;
+    }).join("") || `<div style="color:var(--text-faint);font-size:12.5px;">Todavía no hay sitios registrados.</div>`;
+
+    const maquinas = maquinasVisiblesPara(uid);
+    const maquinasHtml = maquinas.length ? maquinas.map(m => {
+      const cat = buscarMaquina(m.tipoMaquinaCodigo);
+      return `<div class="sac-maquina"><span>${cat ? cat.nombre : m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</span><span class="sac-tipo">${m.contratista || ''}</span></div>`;
+    }).join("") : `<div style="color:var(--text-faint);font-size:12.5px;">Ninguna máquina asignada en los sitios visibles para este inspector.</div>`;
+
+    root.innerHTML = `
+      <div class="modal-overlay" id="modal-overlay">
+        <div class="modal">
+          <button class="modal-close" id="modal-close">✕</button>
+          <div class="section-title" style="margin-top:0;">${u.nombre || u.email}</div>
+          <div style="color:var(--text-muted);font-size:12.5px;margin-bottom:16px;">${u.email}</div>
+
+          <div class="section-title">Sitios asignados</div>
+          <div style="max-height:230px;overflow-y:auto;margin-bottom:6px;">${checklistHtml}</div>
+          <div class="label">Si no marcas ningún inspector para un sitio, ese sitio queda visible para todo el personal de campo.</div>
+
+          <div class="section-title">Máquinas que verá (según sus sitios)</div>
+          <div>${maquinasHtml}</div>
+        </div>
+      </div>`;
+
+    $("#modal-close").onclick = () => root.innerHTML = "";
+    $("#modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") root.innerHTML = ""; };
+    $all("[data-sitio-toggle]").forEach(chk => chk.onchange = async () => {
+      const sitioId = chk.dataset.sitioToggle;
+      const sitio = cacheSitios.find(s => s.id === sitioId);
+      if (!sitio) return;
+      let actuales = [...(sitio.inspectoresAsignados || [])];
+      if (chk.checked){
+        if (!actuales.includes(uid)) actuales.push(uid);
+      } else {
+        actuales = actuales.filter(id => id !== uid);
+      }
+      sitio.inspectoresAsignados = actuales; // optimista, en caché local
+      try{
+        await db.collection(col("sitios")).doc(sitioId).update({ inspectoresAsignados: actuales });
+      } catch(err){
+        showToast("No se pudo actualizar la asignación: " + err.message, "error");
+      }
+      renderContenidoModal();
+      renderTablaInspectores();
+    });
+  }
+  renderContenidoModal();
 }
 
 $("#btn-agregar-maquina-sitio").onclick = () => {
