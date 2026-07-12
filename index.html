@@ -123,6 +123,10 @@
       `SDK de Firebase guardado: ${firebaseGuardado}`,
     ].join(" · ");
 
+    const bloqueError = window.__bitacoraErrorFatal
+      ? `<div style="margin-top:16px;background:#3A2320;border:1px solid #5A2E27;border-radius:8px;padding:10px 14px;color:#FFC1B0;font-size:11px;max-width:300px;font-family:'IBM Plex Mono',monospace;text-align:left;">⚠ Error detectado:<br>${window.__bitacoraErrorFatal}</div>`
+      : "";
+
     splash.innerHTML = `
       <div class="splash-name" style="font-size:22px;">No se pudo conectar</div>
       <div style="color:#93A0AC;font-size:13.5px;max-width:300px;margin-top:10px;line-height:1.5;">
@@ -131,6 +135,7 @@
       </div>
       <button id="btn-reintentar-splash" style="margin-top:24px;padding:12px 22px;border-radius:6px;border:none;background:#E3A008;color:#1B1400;font-weight:600;font-family:inherit;font-size:14px;cursor:pointer;">Reintentar</button>
       <div style="margin-top:26px;color:#5D6A75;font-size:9.5px;max-width:300px;font-family:'IBM Plex Mono',monospace;line-height:1.6;">${diagnostico}</div>
+      ${bloqueError}
       <button id="btn-reiniciar-todo" style="margin-top:18px;padding:8px 14px;border-radius:6px;border:1px solid #3A424B;background:transparent;color:#93A0AC;font-family:inherit;font-size:11.5px;cursor:pointer;">Borrar datos guardados y reintentar (necesita señal)</button>
     `;
     document.getElementById("btn-reintentar-splash").onclick = () => location.reload();
@@ -1166,6 +1171,14 @@
 </div>
 
 <script type="module">
+window.__bitacoraErrorFatal = null;
+window.addEventListener("error", (e) => {
+  if (!window.__bitacoraErrorFatal) window.__bitacoraErrorFatal = `${e.message} (línea ${e.lineno})`;
+});
+window.addEventListener("unhandledrejection", (e) => {
+  if (!window.__bitacoraErrorFatal) window.__bitacoraErrorFatal = "Promesa sin manejar: " + (e.reason?.message || e.reason);
+});
+try {
 /* =========================================================================
    CONFIGURACIÓN DE FIREBASE
    Proyecto: bitacora-maquinaria-47940
@@ -3284,6 +3297,13 @@ async function dibujarMapaInforme(registros){
 $("#btn-imprimir-informe").onclick = () => window.print();
 
 refreshSyncPill();
+
+} catch(err){
+  // Si algo en todo lo anterior lanza un error no capturado, lo exponemos
+  // aquí en vez de dejar la app colgada en el splash sin explicación.
+  window.__bitacoraErrorFatal = (err && err.message) ? err.message : String(err);
+  console.error("Error fatal en el módulo principal:", err);
+}
 </script>
 </body>
 </html>
