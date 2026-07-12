@@ -121,6 +121,7 @@
       `Service workers registrados: ${regs.length}`,
       `Controlando esta pestaña: ${navigator.serviceWorker.controller ? "sí" : "no"}`,
       `SDK de Firebase guardado: ${firebaseGuardado}`,
+      `Última etapa alcanzada: ${window.__bitacoraEtapa || "ninguna (el módulo no llegó a correr)"}`,
     ].join(" · ");
 
     const bloqueError = window.__bitacoraErrorFatal
@@ -1197,12 +1198,23 @@ const firebaseConfig = {
   appId: "1:66030888970:web:cbdd32999b59d2c3c9d7f3"
 };
 
+window.__bitacoraEtapa = "config cargada";
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+window.__bitacoraEtapa = "firebase inicializado";
 
-try { await db.enablePersistence(); } catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
+// Límite de tiempo también aquí: si enablePersistence() se queda esperando
+// (por ejemplo, un candado de otra pestaña que nunca se libera), no debe
+// bloquear el arranque de toda la app indefinidamente.
+try {
+  await Promise.race([
+    db.enablePersistence(),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ]);
+} catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
+window.__bitacoraEtapa = "persistencia intentada";
 
 /* navigator.onLine no siempre es confiable en el sentido de que a veces
    reporta "en línea" sin estarlo — pero cuando reporta "sin conexión" sí es
@@ -1233,8 +1245,11 @@ async function hayConexionReal(timeoutMs = 1000){
   return Promise.race([intento, limiteAbsoluto]);
 }
 
+window.__bitacoraEtapa = "verificando conexión real";
 let hayRed = await hayConexionReal();
+window.__bitacoraEtapa = "conexión verificada (hayRed=" + hayRed + ")";
 if (!hayRed) { try { await db.disableNetwork(); } catch(e){} }
+window.__bitacoraEtapa = "red de Firestore ajustada";
 
 /* Envuelve cualquier lectura de Firestore con un límite de tiempo absoluto.
    Si no responde a tiempo (por ejemplo, porque el dispositivo cree que hay
@@ -1622,6 +1637,7 @@ $("#btn-modo-prueba").onclick = () => {
   location.reload();
 };
 
+window.__bitacoraEtapa = "a punto de registrar onAuthStateChanged";
 auth.onAuthStateChanged(async (user) => {
   window.__bitacoraListo = true;
   if (user){
