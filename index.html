@@ -1248,7 +1248,14 @@ async function hayConexionReal(timeoutMs = 1000){
 window.__bitacoraEtapa = "verificando conexión real";
 let hayRed = await hayConexionReal();
 window.__bitacoraEtapa = "conexión verificada (hayRed=" + hayRed + ")";
-if (!hayRed) { try { await db.disableNetwork(); } catch(e){} }
+if (!hayRed) {
+  try {
+    await Promise.race([
+      db.disableNetwork(),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch(e){}
+}
 window.__bitacoraEtapa = "red de Firestore ajustada";
 
 /* Envuelve cualquier lectura de Firestore con un límite de tiempo absoluto.
@@ -1540,8 +1547,8 @@ async function refreshSyncPill(){
     text.textContent = "En línea — sincronizado";
   }
 }
-window.addEventListener("online", () => { hayConexionReal().then(online => { hayRed = online; if (online) db.enableNetwork().catch(() => {}); refreshSyncPill(); syncPendingPhotos(); }); });
-window.addEventListener("offline", () => { hayRed = false; db.disableNetwork().catch(() => {}); refreshSyncPill(); });
+window.addEventListener("online", () => { hayConexionReal().then(online => { hayRed = online; if (online) Promise.race([db.enableNetwork(), new Promise(r => setTimeout(r, 3000))]).catch(() => {}); refreshSyncPill(); syncPendingPhotos(); }); });
+window.addEventListener("offline", () => { hayRed = false; Promise.race([db.disableNetwork(), new Promise(r => setTimeout(r, 3000))]).catch(() => {}); refreshSyncPill(); });
 // Revisamos la conexión real de forma activa cada 20s, sin depender solo de
 // los eventos online/offline del navegador (que a veces no son confiables).
 setInterval(async () => {
