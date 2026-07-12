@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b3";
+  window.__bitacoraBuild = "2026-07-11-b4";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -1640,13 +1640,29 @@ $("#btn-modo-prueba").onclick = () => {
 window.__bitacoraEtapa = "a punto de registrar onAuthStateChanged";
 auth.onAuthStateChanged(async (user) => {
   window.__bitacoraListo = true;
+  window.__bitacoraEtapa = "onAuthStateChanged disparado (user=" + (user ? "sí" : "no") + ")";
   if (user){
     currentUser = user;
-    const userDoc = await db.collection("usuarios").doc(user.uid).get();
-    currentRole = userDoc.exists ? userDoc.data().role : "campo";
+    const claveCachePerfil = "bitacora_perfil_" + user.uid;
+    // Límite de tiempo: si esta lectura no responde rápido (por ejemplo,
+    // porque Firestore todavía no terminó de pasar a modo offline), no nos
+    // quedamos esperando — usamos lo último que sepamos de este usuario,
+    // guardado la última vez que sí hubo señal.
+    const userDoc = await conTimeout(db.collection("usuarios").doc(user.uid).get(), 4000, null);
+    let nombrePerfil = null;
+    if (userDoc){
+      currentRole = userDoc.exists ? userDoc.data().role : "campo";
+      nombrePerfil = userDoc.data()?.nombre || null;
+      try { localStorage.setItem(claveCachePerfil, JSON.stringify({ role: currentRole, nombre: nombrePerfil })); } catch(e){}
+    } else {
+      let cache = null;
+      try { cache = JSON.parse(localStorage.getItem(claveCachePerfil) || "null"); } catch(e){}
+      currentRole = cache?.role || "campo";
+      nombrePerfil = cache?.nombre || null;
+    }
     mostrarPantallaAuth(null);
     $("#app").classList.add("active");
-    $("#user-chip").textContent = `${userDoc.data()?.nombre || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
+    $("#user-chip").textContent = `${nombrePerfil || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
     if (currentRole === "admin"){
       $("#nav-panel").classList.remove("hidden");
       $("#nav-usuarios").classList.remove("hidden");
@@ -1671,6 +1687,20 @@ auth.onAuthStateChanged(async (user) => {
     mostrarPantallaAuth(yaVioBienvenida ? "login" : "welcome");
   }
 });
+
+// Red de seguridad final: si Firebase Auth mismo nunca llega a determinar el
+// estado de sesión (el propio callback de arriba nunca se dispara — algo
+// poco común, pero que puede pasar sin señal real), no dejamos a la persona
+// esperando para siempre. A los 4 segundos, mostramos la pantalla de acceso
+// de todas formas. Si Auth resuelve más tarde con una sesión activa, el
+// listener de arriba se encarga de mostrar la app en ese momento.
+setTimeout(() => {
+  if (window.__bitacoraListo) return;
+  window.__bitacoraListo = true;
+  window.__bitacoraEtapa = "onAuthStateChanged nunca se disparó — forzando pantalla de acceso";
+  const yaVioBienvenida = localStorage.getItem("bitacora_welcome_visto") === "1";
+  mostrarPantallaAuth(yaVioBienvenida ? "login" : "welcome");
+}, 4000);
 
 /* =========================================================================
    NAVEGACIÓN
