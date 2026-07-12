@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b2";
+  window.__bitacoraBuild = "2026-07-11-b3";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -1207,16 +1207,12 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 window.__bitacoraEtapa = "firebase inicializado";
 
-// Límite de tiempo también aquí: si enablePersistence() se queda esperando
-// (por ejemplo, un candado de otra pestaña que nunca se libera), no debe
-// bloquear el arranque de toda la app indefinidamente.
-try {
-  await Promise.race([
-    db.enablePersistence(),
-    new Promise((resolve) => setTimeout(resolve, 3000)),
-  ]);
-} catch(e) { console.warn("Persistencia offline no disponible:", e.code); }
-window.__bitacoraEtapa = "persistencia intentada";
+// Ya no esperamos esto ("await"): incluso con límite de tiempo, esta llamada
+// demostró poder quedarse colgada de una forma que ni un timeout resuelve.
+// La disparamos en paralelo y seguimos de inmediato — si funciona, mejor;
+// si no, la app sigue funcionando igual sin persistencia local extra.
+db.enablePersistence().catch((e) => console.warn("Persistencia offline no disponible:", e.code));
+window.__bitacoraEtapa = "persistencia disparada (sin esperar)";
 
 /* navigator.onLine no siempre es confiable en el sentido de que a veces
    reporta "en línea" sin estarlo — pero cuando reporta "sin conexión" sí es
@@ -1250,15 +1246,10 @@ async function hayConexionReal(timeoutMs = 1000){
 window.__bitacoraEtapa = "verificando conexión real";
 let hayRed = await hayConexionReal();
 window.__bitacoraEtapa = "conexión verificada (hayRed=" + hayRed + ")";
-if (!hayRed) {
-  try {
-    await Promise.race([
-      db.disableNetwork(),
-      new Promise((resolve) => setTimeout(resolve, 3000)),
-    ]);
-  } catch(e){}
-}
-window.__bitacoraEtapa = "red de Firestore ajustada";
+// Igual que arriba: ya no esperamos disableNetwork(), por la misma razón.
+// La disparamos sin await y seguimos de inmediato.
+if (!hayRed) { db.disableNetwork().catch(() => {}); }
+window.__bitacoraEtapa = "red de Firestore ajustada (sin esperar confirmación)";
 
 /* Envuelve cualquier lectura de Firestore con un límite de tiempo absoluto.
    Si no responde a tiempo (por ejemplo, porque el dispositivo cree que hay
