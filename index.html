@@ -23,6 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
+  window.__bitacoraBuild = "2026-07-11-b2";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -116,6 +117,7 @@
       firebaseGuardado = `${guardados}/${URLS_CRITICAS.length}`;
     } catch(e){}
     const diagnostico = [
+      `Versión de código: ${window.__bitacoraBuild}`,
       `Conexión del navegador: ${navigator.onLine ? "en línea" : "sin conexión"}`,
       `Service worker: ${window.__bitacoraSWEstado}`,
       `Service workers registrados: ${regs.length}`,
