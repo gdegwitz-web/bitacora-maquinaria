@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b4";
+  window.__bitacoraBuild = "2026-07-11-b5";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -1638,69 +1638,90 @@ $("#btn-modo-prueba").onclick = () => {
 };
 
 window.__bitacoraEtapa = "a punto de registrar onAuthStateChanged";
+async function mostrarSesionActiva(user){
+  currentUser = user;
+  const claveCachePerfil = "bitacora_perfil_" + user.uid;
+  // Límite de tiempo: si esta lectura no responde rápido (por ejemplo,
+  // porque Firestore todavía no terminó de pasar a modo offline), no nos
+  // quedamos esperando — usamos lo último que sepamos de este usuario,
+  // guardado la última vez que sí hubo señal.
+  const userDoc = await conTimeout(db.collection("usuarios").doc(user.uid).get(), 4000, null);
+  let nombrePerfil = null;
+  if (userDoc){
+    currentRole = userDoc.exists ? userDoc.data().role : "campo";
+    nombrePerfil = userDoc.data()?.nombre || null;
+    try { localStorage.setItem(claveCachePerfil, JSON.stringify({ role: currentRole, nombre: nombrePerfil })); } catch(e){}
+  } else {
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(claveCachePerfil) || "null"); } catch(e){}
+    currentRole = cache?.role || "campo";
+    nombrePerfil = cache?.nombre || null;
+  }
+  mostrarPantallaAuth(null);
+  $("#app").classList.add("active");
+  $("#user-chip").textContent = `${nombrePerfil || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
+  if (currentRole === "admin"){
+    $("#nav-panel").classList.remove("hidden");
+    $("#nav-usuarios").classList.remove("hidden");
+    $("#nav-inspectores").classList.remove("hidden");
+    $("#nav-sitios").classList.remove("hidden");
+    $("#nav-informe").classList.remove("hidden");
+    cargarPanelAdmin();
+    cargarUsuarios();
+  } else {
+    $("#nav-mis-sitios").classList.remove("hidden");
+  }
+  cargarSitios();
+  cargarMisRegistros();
+  goToView(currentRole === "admin" ? "panel" : "captura");
+  refreshSyncPill();
+  syncPendingPhotos();
+}
+
+function mostrarSinSesion(){
+  currentUser = null; currentRole = null;
+  if (unsubRegistros) unsubRegistros();
+  $("#app").classList.remove("active");
+  const yaVioBienvenida = localStorage.getItem("bitacora_welcome_visto") === "1";
+  mostrarPantallaAuth(yaVioBienvenida ? "login" : "welcome");
+}
+
 auth.onAuthStateChanged(async (user) => {
   window.__bitacoraListo = true;
   window.__bitacoraEtapa = "onAuthStateChanged disparado (user=" + (user ? "sí" : "no") + ")";
-  if (user){
-    currentUser = user;
-    const claveCachePerfil = "bitacora_perfil_" + user.uid;
-    // Límite de tiempo: si esta lectura no responde rápido (por ejemplo,
-    // porque Firestore todavía no terminó de pasar a modo offline), no nos
-    // quedamos esperando — usamos lo último que sepamos de este usuario,
-    // guardado la última vez que sí hubo señal.
-    const userDoc = await conTimeout(db.collection("usuarios").doc(user.uid).get(), 4000, null);
-    let nombrePerfil = null;
-    if (userDoc){
-      currentRole = userDoc.exists ? userDoc.data().role : "campo";
-      nombrePerfil = userDoc.data()?.nombre || null;
-      try { localStorage.setItem(claveCachePerfil, JSON.stringify({ role: currentRole, nombre: nombrePerfil })); } catch(e){}
-    } else {
-      let cache = null;
-      try { cache = JSON.parse(localStorage.getItem(claveCachePerfil) || "null"); } catch(e){}
-      currentRole = cache?.role || "campo";
-      nombrePerfil = cache?.nombre || null;
-    }
-    mostrarPantallaAuth(null);
-    $("#app").classList.add("active");
-    $("#user-chip").textContent = `${nombrePerfil || user.email} · ${currentRole === "admin" ? "Administrador" : "Campo"}`;
-    if (currentRole === "admin"){
-      $("#nav-panel").classList.remove("hidden");
-      $("#nav-usuarios").classList.remove("hidden");
-      $("#nav-inspectores").classList.remove("hidden");
-      $("#nav-sitios").classList.remove("hidden");
-      $("#nav-informe").classList.remove("hidden");
-      cargarPanelAdmin();
-      cargarUsuarios();
-    } else {
-      $("#nav-mis-sitios").classList.remove("hidden");
-    }
-    cargarSitios();
-    cargarMisRegistros();
-    goToView(currentRole === "admin" ? "panel" : "captura");
-    refreshSyncPill();
-    syncPendingPhotos();
-  } else {
-    currentUser = null; currentRole = null;
-    if (unsubRegistros) unsubRegistros();
-    $("#app").classList.remove("active");
-    const yaVioBienvenida = localStorage.getItem("bitacora_welcome_visto") === "1";
-    mostrarPantallaAuth(yaVioBienvenida ? "login" : "welcome");
-  }
+  if (user) await mostrarSesionActiva(user);
+  else mostrarSinSesion();
 });
 
-// Red de seguridad final: si Firebase Auth mismo nunca llega a determinar el
-// estado de sesión (el propio callback de arriba nunca se dispara — algo
-// poco común, pero que puede pasar sin señal real), no dejamos a la persona
-// esperando para siempre. A los 4 segundos, mostramos la pantalla de acceso
-// de todas formas. Si Auth resuelve más tarde con una sesión activa, el
-// listener de arriba se encarga de mostrar la app en ese momento.
-setTimeout(() => {
-  if (window.__bitacoraListo) return;
-  window.__bitacoraListo = true;
-  window.__bitacoraEtapa = "onAuthStateChanged nunca se disparó — forzando pantalla de acceso";
-  const yaVioBienvenida = localStorage.getItem("bitacora_welcome_visto") === "1";
-  mostrarPantallaAuth(yaVioBienvenida ? "login" : "welcome");
-}, 4000);
+// Red de seguridad reforzada: si el evento onAuthStateChanged no se dispara
+// a tiempo (le hemos visto pasar esto sin señal), revisamos directamente
+// auth.currentUser cada 200ms — Firebase suele fijar esa propiedad apenas
+// resuelve la sesión guardada localmente, incluso cuando el evento formal
+// tarda o nunca llega. Si tras ~4 segundos seguimos sin nada, ahí sí
+// mostramos la pantalla de acceso.
+let intentosSesion = 0;
+const revisionSesion = setInterval(async () => {
+  intentosSesion++;
+  if (window.__bitacoraListo){ clearInterval(revisionSesion); return; }
+  if (auth.currentUser){
+    clearInterval(revisionSesion);
+    window.__bitacoraListo = true;
+    window.__bitacoraEtapa = "sesión detectada vía auth.currentUser (el evento no había disparado)";
+    await mostrarSesionActiva(auth.currentUser);
+    return;
+  }
+  if (intentosSesion >= 20){
+    clearInterval(revisionSesion);
+    if (window.__bitacoraListo) return;
+    window.__bitacoraListo = true;
+    window.__bitacoraEtapa = "ni el evento ni auth.currentUser respondieron — sin sesión detectable";
+    mostrarSinSesion();
+  }
+}, 200);
+
+// (La antigua red de seguridad de un solo setTimeout quedó reemplazada por
+// la revisión activa por intervalos de arriba, que además intenta
+// recuperar la sesión vía auth.currentUser antes de rendirse.)
 
 /* =========================================================================
    NAVEGACIÓN
