@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b5";
+  window.__bitacoraBuild = "2026-07-11-b6";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -94,12 +94,14 @@
     window.__bitacoraSWEstado = "no soportado por este navegador";
   }
 
-  // Red de seguridad: si a los 6 segundos el módulo principal (Firebase) no
+  // Red de seguridad: si a los 27 segundos el módulo principal (Firebase) no
   // logró confirmar el estado de sesión, no dejamos a la persona mirando la
-  // pantalla de carga para siempre. Esto pasa normalmente cuando no hay señal
-  // la primera vez que se abre la app, antes de que quede todo guardado para
-  // uso sin conexión. El propio módulo marca window.__bitacoraListo = true
-  // en cuanto logra resolver la sesión (con o sin usuario).
+  // pantalla de carga para siempre. Este límite es más largo de lo que
+  // parece necesario porque, sin señal, confirmar una sesión ya guardada
+  // puede tardar hasta ~25 segundos (Firebase intenta primero refrescar el
+  // token en segundo plano y se rinde solo). El propio módulo marca
+  // window.__bitacoraListo = true en cuanto logra resolver la sesión (con o
+  // sin usuario), normalmente mucho antes de llegar a este límite.
   window.__bitacoraListo = false;
   window.__bitacoraSWEstado = "sin intentar";
   setTimeout(async () => {
@@ -143,7 +145,7 @@
     `;
     document.getElementById("btn-reintentar-splash").onclick = () => location.reload();
     document.getElementById("btn-reiniciar-todo").onclick = () => reiniciarAppPorCompleto();
-  }, 6000);
+  }, 27000);
 </script>
 <style>
   :root{
@@ -630,6 +632,7 @@
   <div class="splash-name">BITÁCORA</div>
   <div class="splash-sub">DE MAQUINARIA</div>
   <div class="splash-loader"><span></span><span></span><span></span></div>
+  <div id="splash-estado" style="margin-top:18px;color:#93A0AC;font-size:12px;max-width:280px;text-align:center;min-height:16px;"></div>
 </div>
 
 <!-- ============ BIENVENIDA ============ -->
@@ -1699,10 +1702,23 @@ auth.onAuthStateChanged(async (user) => {
 // resuelve la sesión guardada localmente, incluso cuando el evento formal
 // tarda o nunca llega. Si tras ~4 segundos seguimos sin nada, ahí sí
 // mostramos la pantalla de acceso.
+// Cuando ya sabemos que no hay conexión real, hemos visto que Firebase puede
+// tardar unos 20 segundos en darse por vencido intentando algo en segundo
+// plano (probablemente refrescar el token) antes de resolver la sesión
+// guardada. En vez de rendirnos a los 4 segundos y mostrar un login que no
+// se puede usar sin señal, esperamos lo que realmente hace falta en ese
+// caso — y avisamos en pantalla que seguimos trabajando, no colgados.
+const maxIntentosSesion = hayRed ? 20 : 125; // 4s con señal, ~25s sin señal
 let intentosSesion = 0;
 const revisionSesion = setInterval(async () => {
   intentosSesion++;
   if (window.__bitacoraListo){ clearInterval(revisionSesion); return; }
+
+  if (!hayRed && intentosSesion === 15){ // ~3s: avisamos que puede tardar
+    const estado = document.getElementById("splash-estado");
+    if (estado) estado.textContent = "Confirmando tu sesión guardada… puede tardar unos segundos sin señal.";
+  }
+
   if (auth.currentUser){
     clearInterval(revisionSesion);
     window.__bitacoraListo = true;
@@ -1710,7 +1726,7 @@ const revisionSesion = setInterval(async () => {
     await mostrarSesionActiva(auth.currentUser);
     return;
   }
-  if (intentosSesion >= 20){
+  if (intentosSesion >= maxIntentosSesion){
     clearInterval(revisionSesion);
     if (window.__bitacoraListo) return;
     window.__bitacoraListo = true;
