@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b8";
+  window.__bitacoraBuild = "2026-07-11-b9";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -814,6 +814,34 @@
   </div>
 </div>
 
+<div id="screen-pendiente" class="auth-screen hidden">
+  <div class="login-card" style="text-align:center;">
+    <div class="icon-badge icon-badge-sm" style="margin:0 auto 18px;">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" fill="#E3A008"/>
+        <rect x="12" y="69" width="60" height="13" rx="6.5" fill="#181300"/>
+        <circle cx="22.5" cy="75.5" r="3.1" fill="#E3A008"/>
+        <circle cx="43" cy="75.5" r="3.1" fill="#E3A008"/>
+        <circle cx="61.5" cy="75.5" r="3.1" fill="#E3A008"/>
+        <rect x="14" y="52" width="11" height="18" rx="3" fill="#181300"/>
+        <rect x="23" y="43" width="37" height="27" rx="4" fill="#181300"/>
+        <rect x="28.5" y="48.5" width="14" height="11" rx="2" fill="#E3A008"/>
+        <line x1="57" y1="47" x2="80" y2="23" stroke="#181300" stroke-width="8" stroke-linecap="round"/>
+        <line x1="80" y1="23" x2="92" y2="53" stroke="#181300" stroke-width="6.5" stroke-linecap="round"/>
+        <path d="M92,53 C100,52 101,60 97,65 L85,67 C83,59 87,54 92,53 Z" fill="#181300"/>
+        <polygon points="86,67 88,72.5 90.5,67" fill="#181300"/>
+        <polygon points="91,66.5 93,72 95.5,66.5" fill="#181300"/>
+      </svg>
+    </div>
+    <div id="pendiente-titulo" class="splash-name" style="font-size:22px;">Cuenta en espera</div>
+    <div id="pendiente-texto" style="color:var(--text-muted);font-size:13.5px;margin-top:10px;line-height:1.6;">
+      Tu cuenta fue creada correctamente, pero todavía tiene que aprobarla un administrador antes de que puedas empezar a usar la app. Intenta entrar de nuevo más tarde.
+    </div>
+    <button type="button" class="btn btn-ghost btn-block" id="btn-pendiente-actualizar" style="margin-top:22px;">Ya me aprobaron — reintentar</button>
+    <button type="button" class="btn btn-ghost btn-block" id="btn-pendiente-logout" style="margin-top:10px;">Cerrar sesión</button>
+  </div>
+</div>
+
 <!-- ============ APP ============ -->
 <div id="app">
   <div class="sidebar">
@@ -848,7 +876,7 @@
         <div class="nav-item hidden" data-view="mis-sitios" id="nav-mis-sitios"><span class="nav-icon">⌖</span> Mis sitios</div>
         <div class="nav-item hidden" data-view="panel" id="nav-panel"><span class="nav-icon">▤</span> Panel de control</div>
         <div class="nav-item hidden" data-view="pendientes" id="nav-pendientes"><span class="nav-icon">⏳</span> Pendientes <span id="badge-pendientes" class="nav-badge hidden">0</span></div>
-        <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios</div>
+        <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios <span id="badge-usuarios-pendientes" class="nav-badge hidden">0</span></div>
         <div class="nav-item hidden" data-view="inspectores" id="nav-inspectores"><span class="nav-icon">⛏</span> Inspectores</div>
         <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
         <div class="nav-item hidden" data-view="informe" id="nav-informe"><span class="nav-icon">▦</span> Informe</div>
@@ -1692,6 +1720,14 @@ $("#form-login").addEventListener("submit", async (e) => {
         nombre, email: cred.user.email,
         role: esPreautorizado ? "admin" : "campo",
         rolSolicitado: (!esPreautorizado && rolSolicitado === "admin_solicitado") ? "admin" : null,
+        // Las cuentas creadas por correo pre-autorizado (un admin ya las
+        // agregó de antemano en "Usuarios") nacen activas de inmediato —
+        // ese pre-autorizado ES la aprobación. Todas las demás nacen
+        // "pendiente" y no pueden usar la app hasta que un admin las revise.
+        estadoCuenta: esPreautorizado ? "activa" : "pendiente",
+        revisadaPor: null,
+        revisadaPorNombre: null,
+        revisadaEn: null,
         creadoEn: firebase.firestore.FieldValue.serverTimestamp()
       });
 
@@ -1699,6 +1735,8 @@ $("#form-login").addEventListener("submit", async (e) => {
         showToast("Cuenta creada como administrador (tu correo estaba pre-autorizado).", "success");
       } else if (rolSolicitado === "admin_solicitado"){
         showToast("Cuenta creada. Tu solicitud de administrador quedó pendiente de aprobación.", "success");
+      } else {
+        showToast("Cuenta creada. Un administrador debe aprobarla antes de que puedas empezar a usarla.", "success");
       }
     } else {
       await auth.signInWithEmailAndPassword(email, password);
@@ -1723,7 +1761,7 @@ function traducirErrorAuth(code){
 }
 
 function mostrarPantallaAuth(nombre){
-  ["splash","welcome","login"].forEach(n => {
+  ["splash","welcome","login","pendiente"].forEach(n => {
     $(`#screen-${n}`).classList.toggle("hidden", n !== nombre);
   });
 }
@@ -1733,6 +1771,9 @@ $("#btn-welcome-continue").onclick = () => {
   mostrarPantallaAuth("login");
 };
 $("#btn-login-back").onclick = () => mostrarPantallaAuth("welcome");
+
+$("#btn-pendiente-logout").onclick = () => auth.signOut();
+$("#btn-pendiente-actualizar").onclick = () => location.reload();
 
 $("#btn-logout").onclick = () => auth.signOut();
 $("#btn-logout-icon").onclick = () => auth.signOut();
@@ -1756,17 +1797,36 @@ async function mostrarSesionActiva(user){
   // quedamos esperando — usamos lo último que sepamos de este usuario,
   // guardado la última vez que sí hubo señal.
   const userDoc = await conTimeout(db.collection("usuarios").doc(user.uid).get(), 4000, null);
-  let nombrePerfil = null;
+  let nombrePerfil = null, estadoCuenta = "activa";
   if (userDoc){
     currentRole = userDoc.exists ? userDoc.data().role : "campo";
     nombrePerfil = userDoc.data()?.nombre || null;
-    try { localStorage.setItem(claveCachePerfil, JSON.stringify({ role: currentRole, nombre: nombrePerfil })); } catch(e){}
+    // Las cuentas creadas antes de este control no tienen el campo — se
+    // tratan como ya activas, así nadie que ya usaba la app queda bloqueado.
+    estadoCuenta = userDoc.data()?.estadoCuenta || "activa";
+    try { localStorage.setItem(claveCachePerfil, JSON.stringify({ role: currentRole, nombre: nombrePerfil, estadoCuenta })); } catch(e){}
   } else {
     let cache = null;
     try { cache = JSON.parse(localStorage.getItem(claveCachePerfil) || "null"); } catch(e){}
     currentRole = cache?.role || "campo";
     nombrePerfil = cache?.nombre || null;
+    estadoCuenta = cache?.estadoCuenta || "activa";
   }
+
+  if (estadoCuenta !== "activa"){
+    $("#app").classList.remove("active");
+    document.body.classList.remove("rol-campo");
+    if (estadoCuenta === "rechazada"){
+      $("#pendiente-titulo").textContent = "Cuenta no aprobada";
+      $("#pendiente-texto").textContent = "Un administrador revisó esta cuenta y no fue aprobada. Si crees que esto es un error, contacta a tu administrador.";
+    } else {
+      $("#pendiente-titulo").textContent = "Cuenta en espera";
+      $("#pendiente-texto").textContent = "Tu cuenta fue creada correctamente, pero todavía tiene que aprobarla un administrador antes de que puedas empezar a usar la app. Intenta entrar de nuevo más tarde.";
+    }
+    mostrarPantallaAuth("pendiente");
+    return;
+  }
+
   mostrarPantallaAuth(null);
   $("#app").classList.add("active");
   document.body.classList.toggle("rol-campo", currentRole !== "admin");
@@ -2882,26 +2942,82 @@ async function cargarUsuarios(){
     cacheUsuarios.push({ id: d.id, ...u });
     emailsRegistrados.add(u.email);
     const solicitudBadge = u.rolSolicitado === "admin" && u.role !== "admin" ? ` <span class="badge badge-pending">Solicita admin</span>` : "";
+    const estadoCuenta = u.estadoCuenta || "activa";
+    const estadoBadge = estadoCuenta === "pendiente" ? ` <span class="badge badge-pending">Cuenta pendiente</span>`
+      : estadoCuenta === "rechazada" ? ` <span class="badge badge-alert">Cuenta rechazada</span>` : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${u.nombre || "—"}</td>
       <td>${u.email}</td>
-      <td>${u.role === "admin" ? "Administrador" : "Campo"}${solicitudBadge}</td>
-      <td></td>`;
-    const btn = document.createElement("button");
-    btn.className = "btn btn-ghost btn-sm";
-    btn.textContent = u.role === "admin" ? "Quitar rol admin" : "Hacer administrador";
-    btn.onclick = async () => {
-      await db.collection("usuarios").doc(d.id).update({ role: u.role === "admin" ? "campo" : "admin" });
+      <td>${u.role === "admin" ? "Administrador" : "Campo"}${solicitudBadge}${estadoBadge}</td>
+      <td style="white-space:nowrap;"></td>`;
+    const celdaAcciones = tr.lastElementChild;
+
+    if (estadoCuenta === "pendiente" || estadoCuenta === "rechazada"){
+      const btnAprobar = document.createElement("button");
+      btnAprobar.className = "btn btn-primary btn-sm";
+      btnAprobar.textContent = "Aprobar cuenta";
+      btnAprobar.style.marginRight = "6px";
+      btnAprobar.onclick = async () => {
+        await db.collection("usuarios").doc(d.id).update({
+          estadoCuenta: "activa",
+          revisadaPor: currentUser.uid,
+          revisadaPorNombre: $("#user-chip").textContent,
+          revisadaEn: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        cargarUsuarios();
+        showToast("Cuenta aprobada — ya puede usar la app.", "success");
+      };
+      celdaAcciones.appendChild(btnAprobar);
+
+      if (estadoCuenta === "pendiente"){
+        const btnRechazar = document.createElement("button");
+        btnRechazar.className = "btn btn-ghost btn-sm";
+        btnRechazar.textContent = "Rechazar";
+        btnRechazar.onclick = async () => {
+          if (!confirm(`¿Rechazar la cuenta de ${u.email}? No podrá usar la app.`)) return;
+          await db.collection("usuarios").doc(d.id).update({
+            estadoCuenta: "rechazada",
+            revisadaPor: currentUser.uid,
+            revisadaPorNombre: $("#user-chip").textContent,
+            revisadaEn: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          cargarUsuarios();
+          showToast("Cuenta rechazada.", "success");
+        };
+        celdaAcciones.appendChild(btnRechazar);
+      }
+    }
+
+    const btnRol = document.createElement("button");
+    btnRol.className = "btn btn-ghost btn-sm";
+    btnRol.style.marginLeft = "6px";
+    btnRol.textContent = u.role === "admin" ? "Quitar rol admin" : "Hacer administrador";
+    btnRol.onclick = async () => {
+      // Promover a alguien a admin es, en la práctica, aprobar su cuenta
+      // también — evita que quede como "admin" pero "pendiente" a la vez.
+      await db.collection("usuarios").doc(d.id).update({
+        role: u.role === "admin" ? "campo" : "admin",
+        estadoCuenta: u.role === "admin" ? estadoCuenta : "activa"
+      });
       cargarUsuarios();
       showToast("Rol actualizado.", "success");
     };
-    tr.lastElementChild.appendChild(btn);
+    celdaAcciones.appendChild(btnRol);
+
     tbody.appendChild(tr);
   });
   cargarPreautorizados(emailsRegistrados);
   renderChecklistInspectores();
+  actualizarBadgeCuentasPendientes();
   if (!$("#view-inspectores").classList.contains("hidden")) renderTablaInspectores();
+}
+function actualizarBadgeCuentasPendientes(){
+  const badge = $("#badge-usuarios-pendientes");
+  if (!badge) return;
+  const n = cacheUsuarios.filter(u => u.estadoCuenta === "pendiente").length;
+  badge.textContent = n;
+  badge.classList.toggle("hidden", n === 0);
 }
 
 async function cargarPreautorizados(emailsRegistrados){
