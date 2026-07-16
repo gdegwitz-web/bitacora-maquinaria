@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b9";
+  window.__bitacoraBuild = "2026-07-11-b10";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -879,6 +879,7 @@
         <div class="nav-item hidden" data-view="usuarios" id="nav-usuarios"><span class="nav-icon">◍</span> Usuarios <span id="badge-usuarios-pendientes" class="nav-badge hidden">0</span></div>
         <div class="nav-item hidden" data-view="inspectores" id="nav-inspectores"><span class="nav-icon">⛏</span> Inspectores</div>
         <div class="nav-item hidden" data-view="sitios" id="nav-sitios"><span class="nav-icon">⌖</span> Sitios de obra</div>
+        <div class="nav-item hidden" data-view="maquinaria" id="nav-maquinaria"><span class="nav-icon">▣</span> Maquinaria</div>
         <div class="nav-item hidden" data-view="informe" id="nav-informe"><span class="nav-icon">▦</span> Informe</div>
       </div>
       <div class="nav-scroll-fade" id="nav-scroll-fade">›</div>
@@ -1251,6 +1252,33 @@
         <table>
           <thead><tr><th>Sitio</th><th>Coordenadas</th><th>Radio</th><th>Máquinas</th><th></th></tr></thead>
           <tbody id="tbody-sitios"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---- VIEW: Maquinaria (admin) ---- -->
+    <div class="view hidden" id="view-maquinaria">
+      <h1 class="page-title">Maquinaria</h1>
+      <p class="page-sub">Listado de todas las máquinas registradas, sin importar en qué sitio estén — desde aquí puedes crear una nueva y asignarla directamente a un sitio.</p>
+
+      <div class="stat-row" style="margin-bottom:18px;">
+        <div class="stat-card"><div class="stat-num" id="maq-stat-total">0</div><div class="stat-label">Máquinas registradas</div></div>
+        <div class="stat-card"><div class="stat-num" id="maq-stat-sitios">0</div><div class="stat-label">Sitios con máquinas</div></div>
+        <div class="stat-card"><div class="stat-num" id="maq-stat-contratistas">0</div><div class="stat-label">Contratistas</div></div>
+      </div>
+
+      <div class="toolbar">
+        <input type="text" id="maq-filtro-texto" placeholder="Buscar por unidad o contratista…">
+        <select id="maq-filtro-sitio"><option value="">Todos los sitios</option></select>
+        <select id="maq-filtro-contratista"><option value="">Todos los contratistas</option></select>
+        <select id="maq-filtro-tipo"><option value="">Todos los tipos</option></select>
+        <button class="btn btn-primary btn-sm" id="btn-nueva-maquina">+ Agregar máquina</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Unidad</th><th>Tipo de maquinaria</th><th>Contratista</th><th>Sitio asignado</th><th></th></tr></thead>
+          <tbody id="tbody-maquinaria"></tbody>
         </table>
       </div>
     </div>
@@ -1837,6 +1865,7 @@ async function mostrarSesionActiva(user){
     $("#nav-usuarios").classList.remove("hidden");
     $("#nav-inspectores").classList.remove("hidden");
     $("#nav-sitios").classList.remove("hidden");
+    $("#nav-maquinaria").classList.remove("hidden");
     $("#nav-informe").classList.remove("hidden");
     cargarPanelAdmin();
     cargarUsuarios();
@@ -1925,6 +1954,7 @@ function goToView(name){
   if (name === "mis-sitios") renderMisSitios();
   if (name === "sitios") inicializarMapaSitioForm();
   if (name === "inspectores") renderTablaInspectores();
+  if (name === "maquinaria") renderTablaMaquinaria();
   if (name === "pendientes") renderPendientes();
 }
 $all(".nav-item").forEach(item => item.onclick = () => goToView(item.dataset.view));
@@ -3080,6 +3110,7 @@ async function cargarSitios(){
 
   if (currentRole === "admin") renderTablaSitios();
   if (currentRole === "admin" && !$("#view-inspectores").classList.contains("hidden")) renderTablaInspectores();
+  if (currentRole === "admin" && !$("#view-maquinaria").classList.contains("hidden")) renderTablaMaquinaria();
   if (currentRole !== "admin" && !$("#view-mis-sitios").classList.contains("hidden")) renderMisSitios();
 }
 
@@ -3185,6 +3216,193 @@ function renderTablaSitios(){
   });
   $all("[data-editar-sitio]").forEach(btn => btn.onclick = () => cargarSitioParaEditar(btn.dataset.editarSitio));
 }
+
+/* =========================================================================
+   MAQUINARIA — vista consolidada de todas las máquinas de todos los sitios.
+   Las máquinas siguen viviendo dentro de cada sitio (maquinasAsignadas), esta
+   vista solo las junta todas en una tabla filtrable y da un punto único para
+   crearlas y asignarlas, sin tener que entrar sitio por sitio.
+   ========================================================================= */
+function maquinariaAgregada(){
+  const lista = [];
+  cacheSitios.forEach(s => {
+    (s.maquinasAsignadas || []).forEach((m, idx) => {
+      lista.push({ ...m, sitioId: s.id, sitioNombre: s.nombre, indice: idx });
+    });
+  });
+  return lista;
+}
+
+function poblarFiltrosMaquinaria(){
+  const todas = maquinariaAgregada();
+  const selSitio = $("#maq-filtro-sitio"), selContratista = $("#maq-filtro-contratista"), selTipo = $("#maq-filtro-tipo");
+  if (!selSitio) return;
+  const curSitio = selSitio.value, curContratista = selContratista.value, curTipo = selTipo.value;
+
+  selSitio.innerHTML = `<option value="">Todos los sitios</option>` +
+    cacheSitios.map(s => `<option value="${s.id}">${s.nombre}</option>`).join("");
+  selSitio.value = curSitio;
+
+  const contratistas = [...new Set(todas.map(m => m.contratista).filter(Boolean))].sort();
+  selContratista.innerHTML = `<option value="">Todos los contratistas</option>` + contratistas.map(c => `<option>${c}</option>`).join("");
+  selContratista.value = curContratista;
+
+  const tipos = [...new Set(todas.map(m => m.tipoMaquinaCodigo).filter(Boolean))].sort();
+  selTipo.innerHTML = `<option value="">Todos los tipos</option>` + tipos.map(t => {
+    const cat = buscarMaquina(t);
+    return `<option value="${t}">${t} — ${cat ? cat.nombre : ''}</option>`;
+  }).join("");
+  selTipo.value = curTipo;
+}
+
+function renderTablaMaquinaria(){
+  const tbody = $("#tbody-maquinaria");
+  if (!tbody) return;
+  poblarFiltrosMaquinaria();
+
+  const todas = maquinariaAgregada();
+  $("#maq-stat-total").textContent = todas.length;
+  $("#maq-stat-sitios").textContent = new Set(todas.map(m => m.sitioId)).size;
+  $("#maq-stat-contratistas").textContent = new Set(todas.map(m => m.contratista).filter(Boolean)).size;
+
+  const texto = ($("#maq-filtro-texto").value || "").trim().toLowerCase();
+  const fSitio = $("#maq-filtro-sitio").value;
+  const fContratista = $("#maq-filtro-contratista").value;
+  const fTipo = $("#maq-filtro-tipo").value;
+
+  const filtradas = todas.filter(m => {
+    if (fSitio && m.sitioId !== fSitio) return false;
+    if (fContratista && m.contratista !== fContratista) return false;
+    if (fTipo && m.tipoMaquinaCodigo !== fTipo) return false;
+    if (texto && !(`${m.codigoMaquina} ${m.contratista}`.toLowerCase().includes(texto))) return false;
+    return true;
+  }).sort((a,b) => (a.sitioNombre||'').localeCompare(b.sitioNombre||'') || (a.codigoMaquina||'').localeCompare(b.codigoMaquina||''));
+
+  tbody.innerHTML = filtradas.map(m => {
+    const cat = buscarMaquina(m.tipoMaquinaCodigo);
+    return `
+    <tr>
+      <td style="font-weight:600;">${m.codigoMaquina}</td>
+      <td>${cat ? cat.nombre : m.tipoMaquinaCodigo}<br><span class="informe-mono">${m.tipoMaquinaCodigo}</span></td>
+      <td>${m.contratista || '—'}</td>
+      <td>${m.sitioNombre}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" data-editar-maquina="${m.sitioId}:${m.indice}">Editar</button>
+        <button class="btn btn-ghost btn-sm" data-quitar-maquina-tabla="${m.sitioId}:${m.indice}">Quitar</button>
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">${todas.length === 0 ? 'Todavía no hay ninguna máquina registrada.' : 'Ningún resultado con esos filtros.'}</td></tr>`;
+
+  $all("[data-editar-maquina]").forEach(btn => btn.onclick = () => {
+    const [sitioId, idx] = btn.dataset.editarMaquina.split(":");
+    abrirModalMaquina(sitioId, parseInt(idx));
+  });
+  $all("[data-quitar-maquina-tabla]").forEach(btn => btn.onclick = async () => {
+    const [sitioId, idx] = btn.dataset.quitarMaquinaTabla.split(":");
+    const sitio = cacheSitios.find(s => s.id === sitioId);
+    if (!sitio) return;
+    if (!confirm("¿Quitar esta máquina del sitio? No se borra ningún registro de auditoría ya guardado.")) return;
+    const nuevas = [...(sitio.maquinasAsignadas || [])];
+    nuevas.splice(parseInt(idx), 1);
+    try{
+      await db.collection(col("sitios")).doc(sitioId).update({ maquinasAsignadas: nuevas });
+      showToast("Máquina quitada.", "success");
+    } catch(err){
+      showToast("No se pudo quitar la máquina: " + err.message, "error");
+    }
+  });
+}
+
+$("#maq-filtro-texto")?.addEventListener("input", renderTablaMaquinaria);
+$("#maq-filtro-sitio")?.addEventListener("change", renderTablaMaquinaria);
+$("#maq-filtro-contratista")?.addEventListener("change", renderTablaMaquinaria);
+$("#maq-filtro-tipo")?.addEventListener("change", renderTablaMaquinaria);
+
+function abrirModalMaquina(sitioIdExistente, indiceExistente){
+  const editando = sitioIdExistente != null && indiceExistente != null;
+  let datosActuales = null;
+  if (editando){
+    const sitio = cacheSitios.find(s => s.id === sitioIdExistente);
+    datosActuales = sitio?.maquinasAsignadas?.[indiceExistente];
+    if (!datosActuales) return;
+  }
+  const root = $("#modal-root");
+  root.innerHTML = `
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal">
+        <button class="modal-close" id="modal-close">✕</button>
+        <div class="section-title" style="margin-top:0;">${editando ? "Editar máquina" : "Agregar máquina"}</div>
+        <form id="form-maquina-modal">
+          <div class="field">
+            <label class="label">Sitio asignado</label>
+            <select id="mm-sitio" required>
+              <option value="">Seleccionar sitio…</option>
+              ${cacheSitios.map(s => `<option value="${s.id}" ${editando && s.id === sitioIdExistente ? "selected" : ""}>${s.nombre}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Tipo de maquinaria</label>
+            <select id="mm-tipo" required>
+              <option value="">Seleccionar…</option>
+              ${CATALOGO_MAQUINARIA.map(c => `<option value="${c.codigo}" ${editando && c.codigo === datosActuales?.tipoMaquinaCodigo ? "selected" : ""}>${c.codigo} — ${c.nombre}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Placa / unidad</label>
+            <input type="text" id="mm-codigo" placeholder="Ej. EXC-014" value="${datosActuales?.codigoMaquina || ''}" required>
+          </div>
+          <div class="field">
+            <label class="label">Contratista</label>
+            <input type="text" id="mm-contratista" placeholder="Empresa contratista" value="${datosActuales?.contratista || ''}">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">${editando ? "Guardar cambios" : "Agregar máquina"}</button>
+        </form>
+      </div>
+    </div>`;
+
+  $("#modal-close").onclick = () => root.innerHTML = "";
+  $("#modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") root.innerHTML = ""; };
+
+  $("#form-maquina-modal").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nuevoSitioId = $("#mm-sitio").value;
+    const nuevaMaquina = {
+      tipoMaquinaCodigo: $("#mm-tipo").value,
+      codigoMaquina: $("#mm-codigo").value.trim(),
+      contratista: $("#mm-contratista").value.trim(),
+    };
+    if (!nuevoSitioId || !nuevaMaquina.tipoMaquinaCodigo || !nuevaMaquina.codigoMaquina){
+      showToast("Completa el sitio, el tipo y la placa/unidad.", "error");
+      return;
+    }
+    try{
+      if (editando && nuevoSitioId === sitioIdExistente){
+        // Mismo sitio: solo se actualiza esa posición del arreglo.
+        const sitio = cacheSitios.find(s => s.id === nuevoSitioId);
+        const nuevas = [...(sitio.maquinasAsignadas || [])];
+        nuevas[indiceExistente] = nuevaMaquina;
+        await db.collection(col("sitios")).doc(nuevoSitioId).update({ maquinasAsignadas: nuevas });
+      } else if (editando){
+        // Cambió de sitio: se quita del sitio viejo y se agrega al nuevo.
+        const sitioViejo = cacheSitios.find(s => s.id === sitioIdExistente);
+        const restoViejo = (sitioViejo.maquinasAsignadas || []).filter((_, i) => i !== indiceExistente);
+        const sitioNuevo = cacheSitios.find(s => s.id === nuevoSitioId);
+        const listaNueva = [...(sitioNuevo.maquinasAsignadas || []), nuevaMaquina];
+        await db.collection(col("sitios")).doc(sitioIdExistente).update({ maquinasAsignadas: restoViejo });
+        await db.collection(col("sitios")).doc(nuevoSitioId).update({ maquinasAsignadas: listaNueva });
+      } else {
+        const sitio = cacheSitios.find(s => s.id === nuevoSitioId);
+        const listaNueva = [...(sitio.maquinasAsignadas || []), nuevaMaquina];
+        await db.collection(col("sitios")).doc(nuevoSitioId).update({ maquinasAsignadas: listaNueva });
+      }
+      showToast(editando ? "Máquina actualizada." : "Máquina agregada.", "success");
+      root.innerHTML = "";
+    } catch(err){
+      showToast("No se pudo guardar: " + err.message, "error");
+    }
+  });
+}
+$("#btn-nueva-maquina")?.addEventListener("click", () => abrirModalMaquina(null, null));
 
 /* ---------- Mapa interactivo para ubicar el sitio con un pin ---------- */
 let mapaSitioFormActual = null;
