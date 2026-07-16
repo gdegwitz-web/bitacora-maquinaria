@@ -23,7 +23,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script>
   // Debe coincidir exactamente con CACHE_NAME en sw.js.
-  window.__bitacoraBuild = "2026-07-11-b10";
+  window.__bitacoraBuild = "2026-07-11-b11";
   const NOMBRE_CACHE_ACTUAL = "bitacora-maquinaria-v4";
   const URLS_CRITICAS = [
     "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -1220,21 +1220,7 @@
 
             <div class="section-title">Máquinas asignadas a este sitio</div>
             <div id="lista-maquinas-asignadas" style="margin-bottom:12px;"></div>
-            <div class="grid-2">
-              <div class="field">
-                <label class="label">Tipo de maquinaria</label>
-                <select id="sm-tipo"><option value="">Seleccionar…</option></select>
-              </div>
-              <div class="field">
-                <label class="label">Placa / unidad</label>
-                <input type="text" id="sm-codigo" placeholder="Ej. EXC-014">
-              </div>
-              <div class="field" style="grid-column:1/-1;">
-                <label class="label">Contratista</label>
-                <input type="text" id="sm-contratista" placeholder="Empresa contratista">
-              </div>
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm btn-block" id="btn-agregar-maquina-sitio" style="margin-bottom:16px;">+ Agregar máquina a la lista</button>
+            <p class="label" style="margin-bottom:16px;">Para agregar, quitar o mover máquinas, usa la pestaña <b>Maquinaria</b> — ahí se gestionan todas juntas, incluso antes de asignarlas a un sitio.</p>
 
             <div class="section-title">Personal de campo asignado</div>
             <div class="field">
@@ -1648,6 +1634,7 @@ let fotosMeta = { antes: null, despues: null }; // {lat,lng,precision,timestamp}
 let unsubRegistros = null;
 let cacheRegistros = [];
 let cacheSitios = [];
+let cacheMaquinas = [];
 let cacheUsuarios = [];
 
 const $ = (sel) => document.querySelector(sel);
@@ -1872,7 +1859,8 @@ async function mostrarSesionActiva(user){
   } else {
     $("#nav-mis-sitios").classList.remove("hidden");
   }
-  cargarSitios();
+  await cargarSitios();
+  cargarMaquinas();
   cargarMisRegistros();
   goToView(currentRole === "admin" ? "panel" : "captura");
   refreshSyncPill();
@@ -2064,7 +2052,7 @@ async function detectarUbicacionYMaquinas(mostrarErrorSiFalla){
 function mostrarMaquinasSugeridas(sitio){
   const bloque = $("#bloque-maquinas-sugeridas");
   const cont = $("#maquinas-sugeridas");
-  const lista = sitio?.maquinasAsignadas || [];
+  const lista = sitio ? cacheMaquinas.filter(m => m.sitioId === sitio.id) : [];
   if (!sitio || lista.length === 0){
     bloque.classList.add("hidden");
     cont.innerHTML = "";
@@ -3114,6 +3102,50 @@ async function cargarSitios(){
   if (currentRole !== "admin" && !$("#view-mis-sitios").classList.contains("hidden")) renderMisSitios();
 }
 
+async function cargarMaquinas(){
+  const snap = await db.collection(col("maquinas")).get();
+  cacheMaquinas = [];
+  snap.forEach(d => cacheMaquinas.push({ id: d.id, ...d.data() }));
+
+  // Migración de una sola vez: si esta cuenta es admin y todavía quedan
+  // sitios con máquinas guardadas "adentro" (formato anterior), las
+  // convertimos en documentos independientes de esta colección nueva y
+  // limpiamos el campo viejo — así no se pierde nada de lo ya cargado.
+  if (currentRole === "admin"){
+    const sitiosConLegado = cacheSitios.filter(s => (s.maquinasAsignadas || []).length > 0);
+    if (sitiosConLegado.length > 0){
+      try{
+        for (const s of sitiosConLegado){
+          for (const m of s.maquinasAsignadas){
+            const ref = await db.collection(col("maquinas")).add({
+              tipoMaquinaCodigo: m.tipoMaquinaCodigo,
+              codigoMaquina: m.codigoMaquina,
+              contratista: m.contratista || "",
+              sitioId: s.id,
+              creadoPor: currentUser.uid,
+              creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            cacheMaquinas.push({ id: ref.id, tipoMaquinaCodigo: m.tipoMaquinaCodigo, codigoMaquina: m.codigoMaquina, contratista: m.contratista || "", sitioId: s.id });
+          }
+          await db.collection(col("sitios")).doc(s.id).update({ maquinasAsignadas: firebase.firestore.FieldValue.delete() });
+        }
+        showToast(`Se migraron ${sitiosConLegado.reduce((n,s)=>n+s.maquinasAsignadas.length,0)} máquinas al nuevo listado independiente.`, "success");
+      } catch(err){
+        console.warn("No se pudo completar la migración de máquinas heredadas:", err.message);
+      }
+    }
+  }
+
+  if (currentRole === "admin" && !$("#view-maquinaria").classList.contains("hidden")) renderTablaMaquinaria();
+  if (currentRole === "admin" && !$("#view-inspectores").classList.contains("hidden")) renderTablaInspectores();
+  if (currentRole === "admin" && !$("#view-sitios").classList.contains("hidden")) renderTablaSitios();
+  if (currentRole !== "admin" && !$("#view-mis-sitios").classList.contains("hidden")) renderMisSitios();
+  if (!$("#view-captura").classList.contains("hidden")) {
+    const sitioSel = cacheSitios.find(s => s.id === $("#f-sitio").value);
+    if (sitioSel) mostrarMaquinasSugeridas(sitioSel);
+  }
+}
+
 /* ---------- Mis sitios (personal de campo) ---------- */
 let mapaMisSitiosActual = null;
 
@@ -3133,7 +3165,7 @@ async function renderMisSitios(){
     lista.innerHTML = `<p style="color:var(--text-faint);font-size:13.5px;">Todavía no tienes sitios asignados. Habla con tu administrador.</p>`;
   } else {
     lista.innerHTML = mios.map(s => {
-      const maquinas = s.maquinasAsignadas || [];
+      const maquinas = cacheMaquinas.filter(m => m.sitioId === s.id);
       return `
       <div class="sitio-asignado-card">
         <h3>${s.nombre}</h3>
@@ -3194,7 +3226,7 @@ function renderTablaSitios(){
   const tbody = $("#tbody-sitios");
   if (!tbody) return;
   tbody.innerHTML = cacheSitios.map(s => {
-    const nMaquinas = (s.maquinasAsignadas || []).length;
+    const nMaquinas = cacheMaquinas.filter(m => m.sitioId === s.id).length;
     return `
     <tr>
       <td>${s.nombre}</td>
@@ -3218,39 +3250,27 @@ function renderTablaSitios(){
 }
 
 /* =========================================================================
-   MAQUINARIA — vista consolidada de todas las máquinas de todos los sitios.
-   Las máquinas siguen viviendo dentro de cada sitio (maquinasAsignadas), esta
-   vista solo las junta todas en una tabla filtrable y da un punto único para
-   crearlas y asignarlas, sin tener que entrar sitio por sitio.
+   MAQUINARIA — colección propia e independiente (no vive dentro de cada
+   sitio). El sitio es opcional: una máquina puede crearse sin asignar y
+   asignarse después desde aquí mismo o al editarla.
    ========================================================================= */
-function maquinariaAgregada(){
-  const lista = [];
-  cacheSitios.forEach(s => {
-    (s.maquinasAsignadas || []).forEach((m, idx) => {
-      lista.push({ ...m, sitioId: s.id, sitioNombre: s.nombre, indice: idx });
-    });
-  });
-  return lista;
-}
-
 function poblarFiltrosMaquinaria(){
-  const todas = maquinariaAgregada();
   const selSitio = $("#maq-filtro-sitio"), selContratista = $("#maq-filtro-contratista"), selTipo = $("#maq-filtro-tipo");
   if (!selSitio) return;
   const curSitio = selSitio.value, curContratista = selContratista.value, curTipo = selTipo.value;
 
-  selSitio.innerHTML = `<option value="">Todos los sitios</option>` +
+  selSitio.innerHTML = `<option value="">Todos los sitios</option><option value="__sin_asignar__">Sin asignar</option>` +
     cacheSitios.map(s => `<option value="${s.id}">${s.nombre}</option>`).join("");
   selSitio.value = curSitio;
 
-  const contratistas = [...new Set(todas.map(m => m.contratista).filter(Boolean))].sort();
+  const contratistas = [...new Set(cacheMaquinas.map(m => m.contratista).filter(Boolean))].sort();
   selContratista.innerHTML = `<option value="">Todos los contratistas</option>` + contratistas.map(c => `<option>${c}</option>`).join("");
   selContratista.value = curContratista;
 
-  const tipos = [...new Set(todas.map(m => m.tipoMaquinaCodigo).filter(Boolean))].sort();
+  const tipos = [...new Set(cacheMaquinas.map(m => m.tipoMaquinaCodigo).filter(Boolean))].sort();
   selTipo.innerHTML = `<option value="">Todos los tipos</option>` + tipos.map(t => {
     const cat = buscarMaquina(t);
-    return `<option value="${t}">${t} — ${cat ? cat.nombre : ''}</option>`;
+    return `<option value="${t}">${t}${cat ? ' — ' + cat.nombre : ' (modelo agregado manualmente)'}</option>`;
   }).join("");
   selTipo.value = curTipo;
 }
@@ -3260,55 +3280,51 @@ function renderTablaMaquinaria(){
   if (!tbody) return;
   poblarFiltrosMaquinaria();
 
-  const todas = maquinariaAgregada();
-  $("#maq-stat-total").textContent = todas.length;
-  $("#maq-stat-sitios").textContent = new Set(todas.map(m => m.sitioId)).size;
-  $("#maq-stat-contratistas").textContent = new Set(todas.map(m => m.contratista).filter(Boolean)).size;
+  $("#maq-stat-total").textContent = cacheMaquinas.length;
+  $("#maq-stat-sitios").textContent = new Set(cacheMaquinas.map(m => m.sitioId).filter(Boolean)).size;
+  $("#maq-stat-contratistas").textContent = new Set(cacheMaquinas.map(m => m.contratista).filter(Boolean)).size;
 
   const texto = ($("#maq-filtro-texto").value || "").trim().toLowerCase();
   const fSitio = $("#maq-filtro-sitio").value;
   const fContratista = $("#maq-filtro-contratista").value;
   const fTipo = $("#maq-filtro-tipo").value;
 
-  const filtradas = todas.filter(m => {
-    if (fSitio && m.sitioId !== fSitio) return false;
+  const filtradas = cacheMaquinas.filter(m => {
+    if (fSitio === "__sin_asignar__" && m.sitioId) return false;
+    if (fSitio && fSitio !== "__sin_asignar__" && m.sitioId !== fSitio) return false;
     if (fContratista && m.contratista !== fContratista) return false;
     if (fTipo && m.tipoMaquinaCodigo !== fTipo) return false;
     if (texto && !(`${m.codigoMaquina} ${m.contratista}`.toLowerCase().includes(texto))) return false;
     return true;
-  }).sort((a,b) => (a.sitioNombre||'').localeCompare(b.sitioNombre||'') || (a.codigoMaquina||'').localeCompare(b.codigoMaquina||''));
+  }).sort((a,b) => (a.codigoMaquina||'').localeCompare(b.codigoMaquina||''));
 
   tbody.innerHTML = filtradas.map(m => {
     const cat = buscarMaquina(m.tipoMaquinaCodigo);
+    const sitio = cacheSitios.find(s => s.id === m.sitioId);
+    const sitioHtml = sitio ? sitio.nombre
+      : m.sitioId ? `<span style="color:var(--text-faint);">Sitio eliminado</span>`
+      : `<span class="badge badge-pending">Sin asignar</span>`;
     return `
     <tr>
       <td style="font-weight:600;">${m.codigoMaquina}</td>
-      <td>${cat ? cat.nombre : m.tipoMaquinaCodigo}<br><span class="informe-mono">${m.tipoMaquinaCodigo}</span></td>
+      <td>${cat ? cat.nombre : m.tipoMaquinaCodigo}<br><span class="informe-mono">${m.tipoMaquinaCodigo}${!cat ? ' · manual' : ''}</span></td>
       <td>${m.contratista || '—'}</td>
-      <td>${m.sitioNombre}</td>
+      <td>${sitioHtml}</td>
       <td style="white-space:nowrap;">
-        <button class="btn btn-ghost btn-sm" data-editar-maquina="${m.sitioId}:${m.indice}">Editar</button>
-        <button class="btn btn-ghost btn-sm" data-quitar-maquina-tabla="${m.sitioId}:${m.indice}">Quitar</button>
+        <button class="btn btn-ghost btn-sm" data-editar-maquina="${m.id}">Editar</button>
+        <button class="btn btn-ghost btn-sm" data-borrar-maquina="${m.id}">Borrar</button>
       </td>
     </tr>`;
-  }).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">${todas.length === 0 ? 'Todavía no hay ninguna máquina registrada.' : 'Ningún resultado con esos filtros.'}</td></tr>`;
+  }).join("") || `<tr><td colspan="5" style="color:var(--text-faint);padding:16px;">${cacheMaquinas.length === 0 ? 'Todavía no hay ninguna máquina registrada.' : 'Ningún resultado con esos filtros.'}</td></tr>`;
 
-  $all("[data-editar-maquina]").forEach(btn => btn.onclick = () => {
-    const [sitioId, idx] = btn.dataset.editarMaquina.split(":");
-    abrirModalMaquina(sitioId, parseInt(idx));
-  });
-  $all("[data-quitar-maquina-tabla]").forEach(btn => btn.onclick = async () => {
-    const [sitioId, idx] = btn.dataset.quitarMaquinaTabla.split(":");
-    const sitio = cacheSitios.find(s => s.id === sitioId);
-    if (!sitio) return;
-    if (!confirm("¿Quitar esta máquina del sitio? No se borra ningún registro de auditoría ya guardado.")) return;
-    const nuevas = [...(sitio.maquinasAsignadas || [])];
-    nuevas.splice(parseInt(idx), 1);
+  $all("[data-editar-maquina]").forEach(btn => btn.onclick = () => abrirModalMaquina(btn.dataset.editarMaquina));
+  $all("[data-borrar-maquina]").forEach(btn => btn.onclick = async () => {
+    if (!confirm("¿Borrar esta máquina por completo? No se borra ningún registro de auditoría ya guardado, pero dejará de sugerirse en el sitio.")) return;
     try{
-      await db.collection(col("sitios")).doc(sitioId).update({ maquinasAsignadas: nuevas });
-      showToast("Máquina quitada.", "success");
+      await db.collection(col("maquinas")).doc(btn.dataset.borrarMaquina).delete();
+      showToast("Máquina borrada.", "success");
     } catch(err){
-      showToast("No se pudo quitar la máquina: " + err.message, "error");
+      showToast("No se pudo borrar: " + err.message, "error");
     }
   });
 }
@@ -3318,14 +3334,18 @@ $("#maq-filtro-sitio")?.addEventListener("change", renderTablaMaquinaria);
 $("#maq-filtro-contratista")?.addEventListener("change", renderTablaMaquinaria);
 $("#maq-filtro-tipo")?.addEventListener("change", renderTablaMaquinaria);
 
-function abrirModalMaquina(sitioIdExistente, indiceExistente){
-  const editando = sitioIdExistente != null && indiceExistente != null;
-  let datosActuales = null;
-  if (editando){
-    const sitio = cacheSitios.find(s => s.id === sitioIdExistente);
-    datosActuales = sitio?.maquinasAsignadas?.[indiceExistente];
-    if (!datosActuales) return;
-  }
+const OTRO_TIPO = "__otro__";
+
+function abrirModalMaquina(idExistente){
+  const editando = !!idExistente;
+  const datosActuales = editando ? cacheMaquinas.find(m => m.id === idExistente) : null;
+  if (editando && !datosActuales) return;
+
+  // Si el tipo guardado no está en el catálogo fijo, es un modelo agregado
+  // a mano — el formulario debe abrir directo en modo "otro", con el
+  // nombre ya escrito, en vez de mostrar el select vacío.
+  const esTipoManual = editando && datosActuales.tipoMaquinaCodigo && !buscarMaquina(datosActuales.tipoMaquinaCodigo);
+
   const root = $("#modal-root");
   root.innerHTML = `
     <div class="modal-overlay" id="modal-overlay">
@@ -3334,18 +3354,23 @@ function abrirModalMaquina(sitioIdExistente, indiceExistente){
         <div class="section-title" style="margin-top:0;">${editando ? "Editar máquina" : "Agregar máquina"}</div>
         <form id="form-maquina-modal">
           <div class="field">
-            <label class="label">Sitio asignado</label>
-            <select id="mm-sitio" required>
-              <option value="">Seleccionar sitio…</option>
-              ${cacheSitios.map(s => `<option value="${s.id}" ${editando && s.id === sitioIdExistente ? "selected" : ""}>${s.nombre}</option>`).join("")}
+            <label class="label">Sitio asignado (opcional)</label>
+            <select id="mm-sitio">
+              <option value="">Sin asignar — asignar después</option>
+              ${cacheSitios.map(s => `<option value="${s.id}" ${editando && s.id === datosActuales?.sitioId ? "selected" : ""}>${s.nombre}</option>`).join("")}
             </select>
           </div>
           <div class="field">
             <label class="label">Tipo de maquinaria</label>
-            <select id="mm-tipo" required>
+            <select id="mm-tipo">
               <option value="">Seleccionar…</option>
               ${CATALOGO_MAQUINARIA.map(c => `<option value="${c.codigo}" ${editando && c.codigo === datosActuales?.tipoMaquinaCodigo ? "selected" : ""}>${c.codigo} — ${c.nombre}</option>`).join("")}
+              <option value="${OTRO_TIPO}" ${esTipoManual ? "selected" : ""}>+ Otro / modelo nuevo…</option>
             </select>
+          </div>
+          <div class="field ${esTipoManual ? '' : 'hidden'}" id="mm-tipo-manual-field">
+            <label class="label">Nombre del modelo nuevo</label>
+            <input type="text" id="mm-tipo-manual" placeholder="Ej. Compactadora de rodillo liso 12 t" value="${esTipoManual ? datosActuales.tipoMaquinaCodigo : ''}">
           </div>
           <div class="field">
             <label class="label">Placa / unidad</label>
@@ -3353,9 +3378,10 @@ function abrirModalMaquina(sitioIdExistente, indiceExistente){
           </div>
           <div class="field">
             <label class="label">Contratista</label>
-            <input type="text" id="mm-contratista" placeholder="Empresa contratista" value="${datosActuales?.contratista || ''}">
+            <input type="text" id="mm-contratista" placeholder="Empresa contratista (o escribe uno nuevo)" value="${datosActuales?.contratista || ''}">
           </div>
           <button type="submit" class="btn btn-primary btn-block">${editando ? "Guardar cambios" : "Agregar máquina"}</button>
+          ${editando ? `<button type="button" class="btn btn-ghost btn-block" id="mm-borrar" style="margin-top:8px;">Borrar máquina</button>` : ""}
         </form>
       </div>
     </div>`;
@@ -3363,37 +3389,46 @@ function abrirModalMaquina(sitioIdExistente, indiceExistente){
   $("#modal-close").onclick = () => root.innerHTML = "";
   $("#modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") root.innerHTML = ""; };
 
+  $("#mm-tipo").addEventListener("change", () => {
+    $("#mm-tipo-manual-field").classList.toggle("hidden", $("#mm-tipo").value !== OTRO_TIPO);
+  });
+
+  if (editando){
+    $("#mm-borrar").onclick = async () => {
+      if (!confirm("¿Borrar esta máquina por completo?")) return;
+      try{
+        await db.collection(col("maquinas")).doc(idExistente).delete();
+        showToast("Máquina borrada.", "success");
+        root.innerHTML = "";
+      } catch(err){
+        showToast("No se pudo borrar: " + err.message, "error");
+      }
+    };
+  }
+
   $("#form-maquina-modal").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const nuevoSitioId = $("#mm-sitio").value;
-    const nuevaMaquina = {
-      tipoMaquinaCodigo: $("#mm-tipo").value,
+    const tipoSel = $("#mm-tipo").value;
+    const tipoFinal = tipoSel === OTRO_TIPO ? $("#mm-tipo-manual").value.trim() : tipoSel;
+    const datos = {
+      tipoMaquinaCodigo: tipoFinal,
       codigoMaquina: $("#mm-codigo").value.trim(),
       contratista: $("#mm-contratista").value.trim(),
+      sitioId: $("#mm-sitio").value || null,
     };
-    if (!nuevoSitioId || !nuevaMaquina.tipoMaquinaCodigo || !nuevaMaquina.codigoMaquina){
-      showToast("Completa el sitio, el tipo y la placa/unidad.", "error");
+    if (!tipoFinal || !datos.codigoMaquina){
+      showToast("Completa al menos el tipo (o el nombre del modelo nuevo) y la placa/unidad.", "error");
       return;
     }
     try{
-      if (editando && nuevoSitioId === sitioIdExistente){
-        // Mismo sitio: solo se actualiza esa posición del arreglo.
-        const sitio = cacheSitios.find(s => s.id === nuevoSitioId);
-        const nuevas = [...(sitio.maquinasAsignadas || [])];
-        nuevas[indiceExistente] = nuevaMaquina;
-        await db.collection(col("sitios")).doc(nuevoSitioId).update({ maquinasAsignadas: nuevas });
-      } else if (editando){
-        // Cambió de sitio: se quita del sitio viejo y se agrega al nuevo.
-        const sitioViejo = cacheSitios.find(s => s.id === sitioIdExistente);
-        const restoViejo = (sitioViejo.maquinasAsignadas || []).filter((_, i) => i !== indiceExistente);
-        const sitioNuevo = cacheSitios.find(s => s.id === nuevoSitioId);
-        const listaNueva = [...(sitioNuevo.maquinasAsignadas || []), nuevaMaquina];
-        await db.collection(col("sitios")).doc(sitioIdExistente).update({ maquinasAsignadas: restoViejo });
-        await db.collection(col("sitios")).doc(nuevoSitioId).update({ maquinasAsignadas: listaNueva });
+      if (editando){
+        await db.collection(col("maquinas")).doc(idExistente).update(datos);
       } else {
-        const sitio = cacheSitios.find(s => s.id === nuevoSitioId);
-        const listaNueva = [...(sitio.maquinasAsignadas || []), nuevaMaquina];
-        await db.collection(col("sitios")).doc(nuevoSitioId).update({ maquinasAsignadas: listaNueva });
+        await db.collection(col("maquinas")).add({
+          ...datos,
+          creadoPor: currentUser.uid,
+          creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+        });
       }
       showToast(editando ? "Máquina actualizada." : "Máquina agregada.", "success");
       root.innerHTML = "";
@@ -3402,7 +3437,7 @@ function abrirModalMaquina(sitioIdExistente, indiceExistente){
     }
   });
 }
-$("#btn-nueva-maquina")?.addEventListener("click", () => abrirModalMaquina(null, null));
+$("#btn-nueva-maquina")?.addEventListener("click", () => abrirModalMaquina(null));
 
 /* ---------- Mapa interactivo para ubicar el sitio con un pin ---------- */
 let mapaSitioFormActual = null;
@@ -3491,35 +3526,32 @@ $("#btn-sitio-gps").onclick = async () => {
   }
 };
 
-/* ---------- Máquinas asignadas a un sitio (mientras se arma el formulario) ---------- */
-let maquinasAsignadasTemp = [];
+/* ---------- Máquinas asignadas a un sitio (solo lectura desde este formulario;
+   se gestionan de verdad en la pestaña Maquinaria) ---------- */
 let inspectoresAsignadosTemp = [];
-
-function poblarSelectMaquinariaSitio(){
-  const sel = $("#sm-tipo");
-  sel.innerHTML = `<option value="">Seleccionar…</option>` +
-    CATALOGO_MAQUINARIA.map(m => `<option value="${m.codigo}">${m.codigo} — ${m.nombre}</option>`).join("");
-}
-poblarSelectMaquinariaSitio();
+let sitioEnEdicionId = null;
 
 function renderListaMaquinasAsignadas(){
   const cont = $("#lista-maquinas-asignadas");
-  if (maquinasAsignadasTemp.length === 0){
+  if (!sitioEnEdicionId){
+    cont.innerHTML = `<div style="color:var(--text-faint);font-size:12.5px;">Guarda el sitio primero para poder asignarle máquinas desde la pestaña Maquinaria.</div>`;
+    return;
+  }
+  const asignadas = cacheMaquinas.filter(m => m.sitioId === sitioEnEdicionId);
+  if (asignadas.length === 0){
     cont.innerHTML = `<div style="color:var(--text-faint);font-size:12.5px;">Ninguna máquina asignada todavía.</div>`;
     return;
   }
-  cont.innerHTML = maquinasAsignadasTemp.map((m, i) => `
+  cont.innerHTML = asignadas.map(m => {
+    const cat = buscarMaquina(m.tipoMaquinaCodigo);
+    return `
     <div class="maquina-asignada-fila">
       <div>
-        <div>${m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</div>
+        <div>${cat ? cat.nombre : m.tipoMaquinaCodigo} · Unidad ${m.codigoMaquina}</div>
         <div class="maf-info">${m.contratista || 'Sin contratista especificado'}</div>
       </div>
-      <button type="button" class="btn btn-ghost btn-sm" data-quitar-maquina="${i}">✕</button>
-    </div>`).join("");
-  $all("[data-quitar-maquina]").forEach(btn => btn.onclick = () => {
-    maquinasAsignadasTemp.splice(parseInt(btn.dataset.quitarMaquina), 1);
-    renderListaMaquinasAsignadas();
-  });
+    </div>`;
+  }).join("");
 }
 renderListaMaquinasAsignadas();
 
@@ -3559,7 +3591,7 @@ function sitiosAsignadosExplicitamente(uid){
 function maquinasDeAsignacionExplicita(uid){
   const vistos = new Set(), lista = [];
   sitiosAsignadosExplicitamente(uid).forEach(s => {
-    (s.maquinasAsignadas || []).forEach(m => {
+    cacheMaquinas.filter(m => m.sitioId === s.id).forEach(m => {
       if (!vistos.has(m.codigoMaquina)){ vistos.add(m.codigoMaquina); lista.push(m); }
     });
   });
@@ -3596,7 +3628,7 @@ function abrirGestionInspector(uid){
     const filasSitios = cacheSitios.map(s => {
       const asignado = (s.inspectoresAsignados || []).includes(uid);
       const abierto = !(s.inspectoresAsignados || []).length;
-      const maquinas = s.maquinasAsignadas || [];
+      const maquinas = cacheMaquinas.filter(m => m.sitioId === s.id);
       const maquinasHtml = maquinas.length
         ? maquinas.map(m => {
             const cat = buscarMaquina(m.tipoMaquinaCodigo);
@@ -3681,7 +3713,7 @@ function abrirGestionInspector(uid){
 
     const puntos = [];
     sitiosAsignados.forEach(s => {
-      const nMaquinas = (s.maquinasAsignadas || []).length;
+      const nMaquinas = cacheMaquinas.filter(m => m.sitioId === s.id).length;
       L.circle([s.lat, s.lng], { radius: s.radio, color: "#E3A008", fillColor: "#E3A008", fillOpacity: 0.1, weight: 2 }).addTo(map);
       L.circleMarker([s.lat, s.lng], { radius: 8, color: "#fff", weight: 2, fillColor: "#E3A008", fillOpacity: 0.95 })
         .addTo(map)
@@ -3697,28 +3729,15 @@ function abrirGestionInspector(uid){
   renderContenidoModal();
 }
 
-$("#btn-agregar-maquina-sitio").onclick = () => {
-  const tipo = $("#sm-tipo").value;
-  const codigo = $("#sm-codigo").value.trim();
-  const contratista = $("#sm-contratista").value.trim();
-  if (!tipo || !codigo){
-    showToast("Elige el tipo de máquina y su placa/unidad antes de agregarla.", "error");
-    return;
-  }
-  maquinasAsignadasTemp.push({ tipoMaquinaCodigo: tipo, codigoMaquina: codigo, contratista });
-  $("#sm-tipo").value = ""; $("#sm-codigo").value = ""; $("#sm-contratista").value = "";
-  renderListaMaquinasAsignadas();
-};
-
 function cargarSitioParaEditar(id){
   const sitio = cacheSitios.find(s => s.id === id);
   if (!sitio) return;
+  sitioEnEdicionId = sitio.id;
   $("#s-editando-id").value = sitio.id;
   $("#s-nombre").value = sitio.nombre;
   $("#s-lat").value = sitio.lat;
   $("#s-lng").value = sitio.lng;
   $("#s-radio").value = sitio.radio;
-  maquinasAsignadasTemp = JSON.parse(JSON.stringify(sitio.maquinasAsignadas || []));
   inspectoresAsignadosTemp = [...(sitio.inspectoresAsignados || [])];
   renderListaMaquinasAsignadas();
   renderChecklistInspectores();
@@ -3733,7 +3752,7 @@ function cancelarEdicionSitio(){
   $("#form-sitio").reset();
   $("#s-editando-id").value = "";
   $("#s-radio").value = 250;
-  maquinasAsignadasTemp = [];
+  sitioEnEdicionId = null;
   inspectoresAsignadosTemp = [];
   renderListaMaquinasAsignadas();
   renderChecklistInspectores();
@@ -3752,7 +3771,6 @@ $("#form-sitio").addEventListener("submit", async (e) => {
     lat: parseFloat($("#s-lat").value),
     lng: parseFloat($("#s-lng").value),
     radio: parseFloat($("#s-radio").value) || 250,
-    maquinasAsignadas: maquinasAsignadasTemp,
     inspectoresAsignados: inspectoresAsignadosTemp
   };
   try{
@@ -3760,12 +3778,13 @@ $("#form-sitio").addEventListener("submit", async (e) => {
       await db.collection(col("sitios")).doc(idEditando).update(datos);
       showToast("Sitio actualizado.", "success");
     } else {
-      await db.collection(col("sitios")).add({
+      const ref = await db.collection(col("sitios")).add({
         ...datos,
         creadoPor: currentUser.uid,
         creadoEn: firebase.firestore.FieldValue.serverTimestamp()
       });
-      showToast("Sitio agregado.", "success");
+      sitioEnEdicionId = ref.id; // por si quieren asignarle máquinas de inmediato
+      showToast("Sitio agregado. Ahora puedes asignarle máquinas desde la pestaña Maquinaria.", "success");
     }
     cancelarEdicionSitio();
     cargarSitios();
